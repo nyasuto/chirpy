@@ -159,10 +159,88 @@ class DatabaseManager:
             row = cursor.fetchone()
             return dict(row) if row else None
 
+    def update_article_summary(self, article_id: int, summary: str) -> bool:
+        """
+        Update article summary.
+
+        Args:
+            article_id: ID of the article to update
+            summary: New summary content
+
+        Returns:
+            True if successful, False otherwise
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            try:
+                cursor.execute(
+                    """
+                    UPDATE articles
+                    SET summary = ?
+                    WHERE id = ?
+                """,
+                    (summary, article_id),
+                )
+
+                conn.commit()
+                return cursor.rowcount > 0
+
+            except sqlite3.Error as e:
+                print(f"Error updating article summary: {e}")
+                return False
+
+    def get_articles_with_empty_summaries(
+        self, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        """
+        Get articles with empty summaries that need content fetching.
+
+        Args:
+            limit: Maximum number of articles to return
+
+        Returns:
+            List of article dictionaries with empty summaries
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            query = """
+                SELECT id, title, link, published, summary, embedded
+                FROM articles
+                WHERE (summary IS NULL OR summary = '' OR
+                       summary = 'No summary available')
+                AND link IS NOT NULL
+                AND link != ''
+                ORDER BY published DESC
+                LIMIT ?
+            """
+
+            cursor.execute(query, (limit,))
+            rows = cursor.fetchall()
+
+            return [dict(row) for row in rows]
+
+    def get_empty_summaries_count(self) -> int:
+        """Get number of articles with empty summaries."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM articles
+                WHERE (summary IS NULL OR summary = '' OR
+                       summary = 'No summary available')
+                AND link IS NOT NULL
+                AND link != ''
+            """)
+            result = cursor.fetchone()
+            return int(result[0]) if result else 0
+
     def get_database_stats(self) -> dict[str, int]:
         """Get database statistics."""
         return {
             "total_articles": self.get_total_count(),
             "read_articles": self.get_read_count(),
             "unread_articles": self.get_unread_count(),
+            "empty_summaries": self.get_empty_summaries_count(),
         }
