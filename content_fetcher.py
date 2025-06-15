@@ -228,4 +228,3 @@ for text-to-speech reading.
     def is_available(self) -> bool:
         """Check if content fetching and summarization is available."""
         return self.openai_client is not None
-
