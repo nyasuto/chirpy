@@ -7,7 +7,8 @@ collect.sh
 __pycache__/
 *.py[cod]
 *$py.class
-
+/.ruff_cache/
+/.mypy_cache/
 # Virtual environment
 venv/
 .venv/
@@ -17,6 +18,10 @@ uv.lock
 
 # Environment variables
 .env
+
+# Logs
+logs/
+*.log
 
 # IDE
 .vscode/

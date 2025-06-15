@@ -4,40 +4,39 @@ Content fetching and AI summarization module for Chirpy.
 Handles fetching article content from URLs and generating summaries using OpenAI API.
 """
 
-import os
 from typing import Any
 
 import requests  # type: ignore
 from bs4 import BeautifulSoup  # type: ignore
-from dotenv import load_dotenv
 
 try:
     import openai  # type: ignore
 except ImportError:
     openai = None  # type: ignore
 
+from config import ChirpyConfig, get_logger
+
 
 class ContentFetcher:
     """Handles content fetching and AI summarization."""
 
-    def __init__(self) -> None:
+    def __init__(self, config: ChirpyConfig) -> None:
         """Initialize the content fetcher."""
-        load_dotenv()
-
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.config = config
+        self.logger = get_logger(__name__)
         self.openai_client = None
 
-        if openai and self.openai_api_key:
+        if openai and config.openai_api_key:
             try:
-                self.openai_client = openai.OpenAI(api_key=self.openai_api_key)
-                print("✅ OpenAI client initialized successfully")
+                self.openai_client = openai.OpenAI(api_key=config.openai_api_key)
+                self.logger.info("OpenAI client initialized successfully")
             except Exception as e:
-                print(f"⚠️  Failed to initialize OpenAI client: {e}")
+                self.logger.warning(f"Failed to initialize OpenAI client: {e}")
         else:
             if not openai:
-                print("⚠️  OpenAI package not available")
-            if not self.openai_api_key:
-                print("⚠️  OPENAI_API_KEY not found in environment")
+                self.logger.warning("OpenAI package not available")
+            if not config.openai_api_key:
+                self.logger.warning("OPENAI_API_KEY not found in configuration")
 
     def fetch_article_content(self, url: str) -> str | None:
         """
@@ -50,7 +49,7 @@ class ContentFetcher:
             Extracted article text or None if failed
         """
         try:
-            print(f"🔗 Fetching content from: {url[:60]}...")
+            self.logger.info(f"Fetching content from: {url[:60]}...")
 
             # Set headers to mimic a real browser
             headers = {
@@ -69,8 +68,10 @@ class ContentFetcher:
                 "Upgrade-Insecure-Requests": "1",
             }
 
-            # Make request with timeout
-            response = requests.get(url, headers=headers, timeout=30)
+            # Make request with configured timeout
+            response = requests.get(
+                url, headers=headers, timeout=self.config.fetch_timeout
+            )
             response.raise_for_status()
 
             # Parse HTML content
@@ -117,17 +118,17 @@ class ContentFetcher:
                 if len(content_text) > 8000:
                     content_text = content_text[:8000] + "..."
 
-                print(f"✅ Content fetched: {len(content_text)} characters")
+                self.logger.info(f"Content fetched: {len(content_text)} characters")
                 return content_text
             else:
-                print("❌ No content found in HTML")
+                self.logger.warning("No content found in HTML")
                 return None
 
         except requests.RequestException as e:
-            print(f"❌ HTTP error fetching {url}: {e}")
+            self.logger.error(f"HTTP error fetching {url}: {e}")
             return None
         except Exception as e:
-            print(f"❌ Error fetching content from {url}: {e}")
+            self.logger.error(f"Error fetching content from {url}: {e}")
             return None
 
     def summarize_content(self, content: str, title: str = "") -> str | None:
@@ -142,11 +143,13 @@ class ContentFetcher:
             Generated summary or None if failed
         """
         if not self.openai_client:
-            print("❌ OpenAI client not available for summarization")
+            self.logger.error("OpenAI client not available for summarization")
             return None
 
         try:
-            print(f"🤖 Generating AI summary for content ({len(content)} chars)...")
+            self.logger.info(
+                f"Generating AI summary for content ({len(content)} chars)..."
+            )
 
             # Create prompt for summarization
             prompt = f"""
@@ -161,9 +164,9 @@ Please provide a summary in 2-3 paragraphs that would be suitable
 for text-to-speech reading.
 """
 
-            # Call OpenAI API
+            # Call OpenAI API with configured settings
             response = self.openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=self.config.openai_model,
                 messages=[
                     {
                         "role": "system",
@@ -175,21 +178,21 @@ for text-to-speech reading.
                     },
                     {"role": "user", "content": prompt},
                 ],
-                max_tokens=500,
-                temperature=0.3,
+                max_tokens=self.config.openai_max_tokens,
+                temperature=self.config.openai_temperature,
             )
 
             summary = response.choices[0].message.content
             if summary:
                 summary = summary.strip()
-                print(f"✅ AI summary generated: {len(summary)} characters")
+                self.logger.info(f"AI summary generated: {len(summary)} characters")
                 return str(summary)
             else:
-                print("❌ Empty response from OpenAI")
+                self.logger.error("Empty response from OpenAI")
                 return None
 
         except Exception as e:
-            print(f"❌ Error generating summary: {e}")
+            self.logger.error(f"Error generating summary: {e}")
             return None
 
     def process_empty_summary_article(self, article: dict[str, Any]) -> str | None:
@@ -207,10 +210,10 @@ for text-to-speech reading.
         title = article.get("title", "")
 
         if not url:
-            print(f"❌ No URL found for article {article_id}")
+            self.logger.error(f"No URL found for article {article_id}")
             return None
 
-        print(f"\n📄 Processing article {article_id}: {title[:50]}...")
+        self.logger.info(f"Processing article {article_id}: {title[:50]}...")
 
         # Step 1: Fetch content
         content = self.fetch_article_content(url)
@@ -222,7 +225,7 @@ for text-to-speech reading.
         if not summary:
             return None
 
-        print(f"✅ Successfully processed article {article_id}")
+        self.logger.info(f"Successfully processed article {article_id}")
         return summary
 
     def is_available(self) -> bool:
