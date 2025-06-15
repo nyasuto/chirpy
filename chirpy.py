@@ -7,6 +7,7 @@ Reads articles from SQLite database and provides audio narration.
 """
 
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ try:
 except ImportError:
     pyttsx3 = None
 
+from content_fetcher import ContentFetcher
 from db_utils import DatabaseManager
 
 
@@ -32,6 +34,7 @@ class ChirpyReader:
 
         self.db = DatabaseManager(str(self.db_path))
         self.tts_engine = self._initialize_tts()
+        self.content_fetcher = ContentFetcher()
 
     def _initialize_tts(self) -> pyttsx3.Engine | None:
         """Initialize text-to-speech engine."""
@@ -98,6 +101,65 @@ class ChirpyReader:
 
         return f"Article title: {title}. Content: {summary}"
 
+    def process_empty_summaries(self, max_articles: int = 5) -> int:
+        """
+        Process articles with empty summaries by fetching content and generating AI summaries.
+
+        Args:
+            max_articles: Maximum number of articles to process
+
+        Returns:
+            Number of articles successfully processed
+        """
+        if not self.content_fetcher.is_available():
+            print("⚠️  Content fetching not available (OpenAI API key required)")
+            return 0
+
+        print("\n📄 Processing articles with empty summaries...")
+
+        # Get articles with empty summaries
+        empty_articles = self.db.get_articles_with_empty_summaries(limit=max_articles)
+
+        if not empty_articles:
+            print("✅ No articles with empty summaries found")
+            return 0
+
+        print(f"📋 Found {len(empty_articles)} articles with empty summaries")
+
+        processed_count = 0
+        for i, article in enumerate(empty_articles, 1):
+            print(f"\n--- Processing article {i}/{len(empty_articles)} ---")
+
+            try:
+                # Process the article (fetch + summarize)
+                summary = self.content_fetcher.process_empty_summary_article(article)
+
+                if summary:
+                    # Update database with new summary
+                    if self.db.update_article_summary(article["id"], summary):
+                        print(f"✅ Updated article {article['id']} with AI summary")
+                        processed_count += 1
+                    else:
+                        print(
+                            f"❌ Failed to update database for article {article['id']}"
+                        )
+                else:
+                    print(f"❌ Failed to generate summary for article {article['id']}")
+
+            except Exception as e:
+                print(f"❌ Error processing article {article['id']}: {e}")
+                continue
+
+            # Rate limiting: pause between requests
+            if i < len(empty_articles):
+                print("⏸️  Pausing to respect API rate limits...")
+                time.sleep(2)
+
+        print(
+            f"\n🎉 Processing complete! {processed_count}/{len(empty_articles)} articles updated"
+        )
+        return processed_count
+
     def read_articles(self) -> None:
         """Read the latest 3 unread articles with text-to-speech."""
         print("🐦 Chirpy RSS Reader Starting...")
@@ -109,6 +171,7 @@ class ChirpyReader:
             print(f"   Total articles: {stats['total_articles']}")
             print(f"   Read articles: {stats['read_articles']}")
             print(f"   Unread articles: {stats['unread_articles']}")
+            print(f"   Empty summaries: {stats['empty_summaries']}")
 
             if stats["unread_articles"] == 0:
                 print("✅ No unread articles found!")
@@ -184,8 +247,16 @@ class ChirpyReader:
 
 def main() -> None:
     """Main entry point."""
+    # Parse command line arguments
     if len(sys.argv) > 1:
-        db_path = sys.argv[1]
+        if sys.argv[1] == "--process-summaries":
+            # Special mode: process empty summaries
+            db_path = sys.argv[2] if len(sys.argv) > 2 else "data/articles.db"
+            reader = ChirpyReader(db_path)
+            reader.process_empty_summaries()
+            return
+        else:
+            db_path = sys.argv[1]
     else:
         db_path = "data/articles.db"
 
