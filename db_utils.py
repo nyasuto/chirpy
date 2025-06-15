@@ -7,7 +7,7 @@ Provides functions for managing articles and read tracking.
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
 class DatabaseManager:
@@ -136,7 +136,7 @@ class DatabaseManager:
             result = cursor.fetchone()
             return int(result[0]) if result else 0
 
-    def get_article_by_id(self, article_id: int) -> Optional[dict[str, Any]]:
+    def get_article_by_id(self, article_id: int) -> dict[str, Any] | None:
         """
         Get article by ID.
 
