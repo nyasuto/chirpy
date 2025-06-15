@@ -150,13 +150,15 @@ class ContentFetcher:
 
             # Create prompt for summarization
             prompt = f"""
-Please summarize the following article in Japanese. Create a concise but comprehensive summary that captures the main points and key information.
+Please summarize the following article in Japanese. Create a concise but
+comprehensive summary that captures the main points and key information.
 
 Title: {title}
 
 Content: {content}
 
-Please provide a summary in 2-3 paragraphs that would be suitable for text-to-speech reading.
+Please provide a summary in 2-3 paragraphs that would be suitable
+for text-to-speech reading.
 """
 
             # Call OpenAI API
@@ -165,7 +167,11 @@ Please provide a summary in 2-3 paragraphs that would be suitable for text-to-sp
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful assistant that creates concise, accurate summaries of Japanese articles. Your summaries should be informative and suitable for audio reading.",
+                        "content": (
+                            "You are a helpful assistant that creates concise, "
+                            "accurate summaries of Japanese articles. Your summaries "
+                            "should be informative and suitable for audio reading."
+                        ),
                     },
                     {"role": "user", "content": prompt},
                 ],

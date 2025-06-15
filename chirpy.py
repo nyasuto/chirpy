@@ -103,7 +103,7 @@ class ChirpyReader:
 
     def process_empty_summaries(self, max_articles: int = 5) -> int:
         """
-        Process articles with empty summaries by fetching content and generating AI summaries.
+        Process articles with empty summaries by fetching and generating summaries.
 
         Args:
             max_articles: Maximum number of articles to process
@@ -156,7 +156,8 @@ class ChirpyReader:
                 time.sleep(2)
 
         print(
-            f"\n🎉 Processing complete! {processed_count}/{len(empty_articles)} articles updated"
+            f"\n🎉 Processing complete! {processed_count}/{len(empty_articles)} "
+            "articles updated"
         )
         return processed_count
 

@@ -176,8 +176,8 @@ class DatabaseManager:
             try:
                 cursor.execute(
                     """
-                    UPDATE articles 
-                    SET summary = ? 
+                    UPDATE articles
+                    SET summary = ?
                     WHERE id = ?
                 """,
                     (summary, article_id),
@@ -207,9 +207,10 @@ class DatabaseManager:
 
             query = """
                 SELECT id, title, link, published, summary, embedded
-                FROM articles 
-                WHERE (summary IS NULL OR summary = '' OR summary = 'No summary available')
-                AND link IS NOT NULL 
+                FROM articles
+                WHERE (summary IS NULL OR summary = '' OR
+                       summary = 'No summary available')
+                AND link IS NOT NULL
                 AND link != ''
                 ORDER BY published DESC
                 LIMIT ?
@@ -225,10 +226,11 @@ class DatabaseManager:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT COUNT(*) 
-                FROM articles 
-                WHERE (summary IS NULL OR summary = '' OR summary = 'No summary available')
-                AND link IS NOT NULL 
+                SELECT COUNT(*)
+                FROM articles
+                WHERE (summary IS NULL OR summary = '' OR
+                       summary = 'No summary available')
+                AND link IS NOT NULL
                 AND link != ''
             """)
             result = cursor.fetchone()
