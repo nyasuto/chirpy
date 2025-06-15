@@ -75,7 +75,7 @@ def check_existing_data(db_path: str) -> None:
         conn.close()
 
 
-def main():
+def main() -> None:
     """Main migration function."""
     db_path = Path(__file__).parent / "data" / "articles.db"
 

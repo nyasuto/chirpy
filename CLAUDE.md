@@ -87,11 +87,16 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 ### Required Workflow
 1. Create branch from main
-2. Make changes and commit
-3. Push branch to remote
-4. Create Pull Request
-5. Wait for CI checks to pass
-6. Merge via GitHub (not locally)
+2. Make changes
+3. **Run Code Quality checks before commit:**
+   - `uv run ruff check .` (linting)
+   - `uv run ruff format .` (formatting)
+   - `uv run mypy .` (type checking)
+4. Commit only after all checks pass
+5. Push branch to remote
+6. Create Pull Request
+7. Wait for CI checks to pass
+8. Merge via GitHub (not locally)
 
 ## Implementation Notes
 

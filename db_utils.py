@@ -110,14 +110,16 @@ class DatabaseManager:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM read_articles")
-            return cursor.fetchone()[0]
+            result = cursor.fetchone()
+            return int(result[0]) if result else 0
 
     def get_total_count(self) -> int:
         """Get total number of articles."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM articles")
-            return cursor.fetchone()[0]
+            result = cursor.fetchone()
+            return int(result[0]) if result else 0
 
     def get_unread_count(self) -> int:
         """Get number of unread articles with content."""
@@ -131,7 +133,8 @@ class DatabaseManager:
                 AND a.summary IS NOT NULL
                 AND a.summary != ''
             """)
-            return cursor.fetchone()[0]
+            result = cursor.fetchone()
+            return int(result[0]) if result else 0
 
     def get_article_by_id(self, article_id: int) -> Optional[dict[str, Any]]:
         """
