@@ -1,2 +1,26 @@
+# Project specific
 collect.sh
 /data/articles.db
+/.claude
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.venv/
+
+# uv
+uv.lock
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store

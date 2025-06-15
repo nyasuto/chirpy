@@ -11,7 +11,7 @@ Chirpy is an MVP RSS reader with text-to-speech functionality. It reads articles
 - **Database**: SQLite3 database (`data/articles.db`) with articles table containing RSS feed data
 - **Data Source**: Database is synchronized from a remote machine using `collect.sh` script
 - **Main Application**: Will be implemented as `chirpy.py` (not yet created)
-- **Tech Stack**: Python 3.x with modern tooling (uv, ruff, ty mentioned in README)
+- **Tech Stack**: Python 3.9+ with modern tooling (uv for dependency management, ruff for linting, mypy for type checking)
 
 ## Database Schema
 
@@ -34,15 +34,21 @@ Key points:
 
 ## Common Commands
 
+### Code Quality
+- Lint code: `uv run ruff check .`
+- Format code: `uv run ruff format .`
+- Type check: `uv run mypy .`
+
 ### Database Operations
 - Check article count: `sqlite3 data/articles.db "SELECT COUNT(*) FROM articles"`
 - View schema: `sqlite3 data/articles.db ".schema articles"`
 - Sync database: `./collect.sh`
 
 ### Development Setup
-- Virtual environment: `python3 -m venv venv && source venv/bin/activate`
-- Install dependencies: `pip install -r requirements.txt`
-- Run application: `python chirpy.py`
+- Install dependencies: `uv sync`
+- Run application: `uv run python chirpy.py`
+- Add new dependency: `uv add <package>`
+- Activate shell: `uv shell`
 
 ## Key Requirements
 
