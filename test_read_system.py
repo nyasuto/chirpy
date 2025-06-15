@@ -7,7 +7,7 @@ Tests the database utilities and read tracking functionality.
 
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from db_utils import DatabaseManager
 
@@ -75,7 +75,7 @@ def test_read_system() -> None:
         if unread_articles:
             article_id = unread_articles[0]["id"]
             print(f"\n🔍 Testing: Get article by ID {article_id}")
-            found_article: Optional[dict[str, Any]] = db.get_article_by_id(article_id)
+            found_article: dict[str, Any] | None = db.get_article_by_id(article_id)
             if found_article is not None:
                 print(f"  Found: {found_article['title'][:50]}...")
             else:
