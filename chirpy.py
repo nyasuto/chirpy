@@ -105,7 +105,7 @@ class ChirpyReader:
         try:
             # Get database statistics
             stats = self.db.get_database_stats()
-            print(f"📊 Database Stats:")
+            print("📊 Database Stats:")
             print(f"   Total articles: {stats['total_articles']}")
             print(f"   Read articles: {stats['read_articles']}")
             print(f"   Unread articles: {stats['unread_articles']}")
@@ -126,7 +126,10 @@ class ChirpyReader:
             print(f"📚 Found {len(articles)} unread articles to read")
 
             # Introduction
-            intro_text = f"Welcome to Chirpy! I found {len(articles)} unread articles to read for you."
+            intro_text = (
+                f"Welcome to Chirpy! I found {len(articles)} unread articles "
+                "to read for you."
+            )
             self.speak_text(intro_text)
 
             # Read each article
@@ -157,7 +160,7 @@ class ChirpyReader:
             conclusion_text = (
                 f"That's all for now! I've read {len(articles)} articles for you."
             )
-            print(f"\n🎉 Session complete!")
+            print("\n🎉 Session complete!")
             self.speak_text(conclusion_text)
 
         except Exception as e:
