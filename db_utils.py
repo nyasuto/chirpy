@@ -9,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from config import get_logger
+
 
 class DatabaseManager:
     """Manages database operations for Chirpy."""
@@ -16,6 +18,7 @@ class DatabaseManager:
     def __init__(self, db_path: str):
         """Initialize database manager."""
         self.db_path = Path(db_path)
+        self.logger = get_logger(__name__)
         if not self.db_path.exists():
             raise FileNotFoundError(f"Database not found: {db_path}")
 
@@ -80,7 +83,7 @@ class DatabaseManager:
                 return cursor.rowcount > 0
 
             except sqlite3.Error as e:
-                print(f"Error marking article as read: {e}")
+                self.logger.error(f"Error marking article as read: {e}")
                 return False
 
     def is_article_read(self, article_id: int) -> bool:
@@ -187,7 +190,7 @@ class DatabaseManager:
                 return cursor.rowcount > 0
 
             except sqlite3.Error as e:
-                print(f"Error updating article summary: {e}")
+                self.logger.error(f"Error updating article summary: {e}")
                 return False
 
     def get_articles_with_empty_summaries(
