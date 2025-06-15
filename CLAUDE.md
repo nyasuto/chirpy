@@ -69,9 +69,10 @@ Key points:
 - Include issue references: `Closes #X` in PR descriptions
 
 ### Branch Naming Convention
-- Feature: `issue-X-feature-name` (e.g., `issue-4-main-script`)
-- Bug fix: `fix-X-description` (e.g., `fix-audio-playback`)
-- Hotfix: `hotfix-X-description`
+- Feature: `feat/issue-X-feature-name` (e.g., `feat/issue-4-main-script`)
+- Bug fix: `fix/X-description` (e.g., `fix/audio-playback`)
+- Hotfix: `hotfix/X-description`
+other things follow to same convention like test/, doc/, cicd/ etc.
 
 ### Commit Message Format
 ```
