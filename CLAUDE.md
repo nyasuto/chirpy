@@ -58,6 +58,41 @@ Key points:
 - Handle empty summaries by fetching from article links
 - Use OpenAI API for content summarization when needed
 
+## Development Workflow
+
+### Git and Commit Rules
+- **NEVER commit directly to main branch**
+- Always create feature branches for changes: `git checkout -b feature-name`
+- Use descriptive branch names: `issue-X-feature-description`
+- Create Pull Requests for all changes, no matter how small
+- All commits must follow conventional commit format
+- Include issue references: `Closes #X` in PR descriptions
+
+### Branch Naming Convention
+- Feature: `issue-X-feature-name` (e.g., `issue-4-main-script`)
+- Bug fix: `fix-X-description` (e.g., `fix-audio-playback`)
+- Hotfix: `hotfix-X-description`
+
+### Commit Message Format
+```
+<type>: <description>
+
+<optional body>
+
+<optional footer with issue references>
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+### Required Workflow
+1. Create branch from main
+2. Make changes and commit
+3. Push branch to remote
+4. Create Pull Request
+5. Wait for CI checks to pass
+6. Merge via GitHub (not locally)
+
 ## Implementation Notes
 
 - Main script should be `chirpy.py` in project root
