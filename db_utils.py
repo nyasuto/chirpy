@@ -239,6 +239,163 @@ class DatabaseManager:
             result = cursor.fetchone()
             return int(result[0]) if result else 0
 
+    def update_article_language_info(
+        self,
+        article_id: int,
+        detected_language: str,
+        original_summary: str | None = None,
+        is_translated: bool = False,
+    ) -> bool:
+        """
+        Update article language detection and translation information.
+
+        Args:
+            article_id: ID of the article to update
+            detected_language: Detected language code (e.g., 'en', 'ja')
+            original_summary: Original summary before translation
+            is_translated: Whether the current summary is translated
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            try:
+                params = (
+                    detected_language,
+                    original_summary,
+                    int(is_translated),
+                    article_id,
+                )
+                cursor.execute(
+                    """
+                    UPDATE articles
+                    SET detected_language = ?,
+                        original_summary = ?,
+                        is_translated = ?
+                    WHERE id = ?
+                    """,
+                    params,
+                )
+
+                conn.commit()
+                return cursor.rowcount > 0
+
+            except sqlite3.Error as e:
+                self.logger.error(f"Error updating article language info: {e}")
+                return False
+
+    def get_articles_by_language(
+        self, language: str, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        """
+        Get articles filtered by detected language.
+
+        Args:
+            language: Language code to filter by
+            limit: Maximum number of articles to return
+
+        Returns:
+            List of article dictionaries
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            try:
+                cursor.execute(
+                    """
+                    SELECT id, title, link, published, summary, embedded,
+                           detected_language, original_summary, is_translated
+                    FROM articles
+                    WHERE detected_language = ?
+                    ORDER BY id DESC
+                    LIMIT ?
+                    """,
+                    (language, limit),
+                )
+
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+
+            except sqlite3.Error as e:
+                self.logger.error(f"Error getting articles by language: {e}")
+                return []
+
+    def get_untranslated_articles(self, limit: int = 10) -> list[dict[str, Any]]:
+        """
+        Get articles that need translation (non-Japanese articles).
+
+        Args:
+            limit: Maximum number of articles to return
+
+        Returns:
+            List of article dictionaries that need translation
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            try:
+                cursor.execute(
+                    """
+                    SELECT id, title, link, published, summary, embedded,
+                           detected_language, original_summary, is_translated
+                    FROM articles
+                    WHERE detected_language != 'ja'
+                      AND detected_language != 'unknown'
+                      AND is_translated = 0
+                      AND summary IS NOT NULL
+                      AND summary != ''
+                    ORDER BY id DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                )
+
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+
+            except sqlite3.Error as e:
+                self.logger.error(f"Error getting untranslated articles: {e}")
+                return []
+
+    def get_translation_stats(self) -> dict[str, Any]:
+        """Get translation statistics."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Count by language
+            cursor.execute(
+                """
+                SELECT detected_language, COUNT(*) as count
+                FROM articles
+                WHERE detected_language != 'unknown'
+                GROUP BY detected_language
+                """
+            )
+            language_counts = {row[0]: row[1] for row in cursor.fetchall()}
+
+            # Count translated articles
+            cursor.execute("SELECT COUNT(*) FROM articles WHERE is_translated = 1")
+            translated_count = cursor.fetchone()[0]
+
+            # Count untranslated non-Japanese articles
+            cursor.execute(
+                """
+                SELECT COUNT(*) FROM articles
+                WHERE detected_language != 'ja'
+                  AND detected_language != 'unknown'
+                  AND is_translated = 0
+                """
+            )
+            untranslated_count = cursor.fetchone()[0]
+
+            return {
+                "language_counts": language_counts,
+                "translated_articles": translated_count,
+                "untranslated_articles": untranslated_count,
+            }
+
     def get_database_stats(self) -> dict[str, int]:
         """Get database statistics."""
         return {

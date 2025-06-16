@@ -14,6 +14,11 @@ try:
 except ImportError:
     openai = None  # type: ignore
 
+try:
+    from langdetect import detect  # type: ignore
+except ImportError:
+    detect = None  # type: ignore
+
 from config import ChirpyConfig, get_logger
 
 
@@ -37,6 +42,33 @@ class ContentFetcher:
                 self.logger.warning("OpenAI package not available")
             if not config.openai_api_key:
                 self.logger.warning("OPENAI_API_KEY not found in configuration")
+
+    def detect_language(self, text: str) -> str:
+        """
+        Detect the language of the given text.
+
+        Args:
+            text: Text to analyze
+
+        Returns:
+            Language code (e.g., 'en', 'ja') or 'unknown' if detection fails
+        """
+        if not detect:
+            self.logger.warning("langdetect library not available")
+            return "unknown"
+
+        if not text or len(text.strip()) < 10:
+            return "unknown"
+
+        try:
+            # Clean text for better detection
+            clean_text = " ".join(text.split())[:1000]  # Use first 1000 chars
+            detected_lang = detect(clean_text)
+            self.logger.debug(f"Detected language: {detected_lang}")
+            return str(detected_lang)
+        except Exception as e:
+            self.logger.warning(f"Language detection failed: {e}")
+            return "unknown"
 
     def fetch_article_content(self, url: str) -> str | None:
         """
@@ -195,6 +227,99 @@ for text-to-speech reading.
             self.logger.error(f"Error generating summary: {e}")
             return None
 
+    def summarize_and_translate(
+        self, content: str, title: str = "", detected_language: str = "unknown"
+    ) -> str | None:
+        """
+        Summarize and optionally translate content based on detected language.
+
+        Args:
+            content: Article content to process
+            title: Article title for context
+            detected_language: Detected language code
+
+        Returns:
+            Japanese summary (translated if needed) or None if failed
+        """
+        if not self.openai_client:
+            self.logger.error("OpenAI client not available for translation")
+            return None
+
+        try:
+            if detected_language == "en":
+                # English article - translate and summarize
+                self.logger.info("Translating and summarizing English article")
+                prompt = f"""
+Please translate the following English article to Japanese and create a
+comprehensive summary.
+The summary should capture all important points and be suitable for
+text-to-speech reading.
+
+Title: {title}
+
+Content: {content}
+
+Instructions:
+1. First understand the full content of the English article
+2. Create a comprehensive Japanese summary that covers all key points
+3. Make the summary natural and fluent in Japanese
+4. Ensure it's suitable for audio reading (2-3 paragraphs)
+"""
+                system_message = (
+                    "You are a professional translator and summarizer. "
+                    "You create accurate Japanese summaries of English articles that "
+                    "preserve all important information while being natural and "
+                    "readable."
+                )
+            else:
+                # Japanese or other languages - normal summarization
+                self.logger.info(f"Summarizing article in {detected_language}")
+                prompt = f"""
+Please summarize the following article in Japanese. Create a concise but
+comprehensive summary that captures the main points and key information.
+
+Title: {title}
+
+Content: {content}
+
+Please provide a summary in 2-3 paragraphs that would be suitable
+for text-to-speech reading.
+"""
+                system_message = (
+                    "You are a helpful assistant that creates concise, "
+                    "accurate summaries in Japanese. Your summaries "
+                    "should be informative and suitable for audio reading."
+                )
+
+            # Call OpenAI API
+            response = self.openai_client.chat.completions.create(
+                model=self.config.openai_model,
+                messages=[
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=self.config.openai_max_tokens,
+                temperature=self.config.openai_temperature,
+            )
+
+            summary = response.choices[0].message.content
+            if summary:
+                summary = summary.strip()
+                action = (
+                    "translated and summarized"
+                    if detected_language == "en"
+                    else "summarized"
+                )
+                self.logger.info(f"Article {action}: {len(summary)} characters")
+                return str(summary)
+            else:
+                self.logger.error("Empty response from OpenAI")
+                return None
+
+        except Exception as e:
+            self.logger.error(f"Error in translation/summarization: {e}")
+            return None
+
     def process_empty_summary_article(self, article: dict[str, Any]) -> str | None:
         """
         Complete workflow: fetch content and generate summary.
@@ -227,6 +352,66 @@ for text-to-speech reading.
 
         self.logger.info(f"Successfully processed article {article_id}")
         return summary
+
+    def process_article_with_translation(
+        self, article: dict[str, Any]
+    ) -> tuple[str | None, str, bool]:
+        """
+        Complete workflow with language detection and translation support.
+
+        Args:
+            article: Article dictionary with id, link, title, summary
+
+        Returns:
+            Tuple of (translated_summary, detected_language, is_translated)
+        """
+        article_id = article.get("id")
+        title = article.get("title", "")
+        existing_summary = article.get("summary", "")
+
+        self.logger.info(
+            f"Processing article {article_id} with translation: {title[:50]}..."
+        )
+
+        # Use existing summary if available, otherwise fetch content
+        if existing_summary and existing_summary not in ("", "No summary available"):
+            content = existing_summary
+            self.logger.info("Using existing summary for processing")
+        else:
+            url = article.get("link")
+            if not url:
+                self.logger.error(f"No URL found for article {article_id}")
+                return None, "unknown", False
+
+            content = self.fetch_article_content(url)
+            if not content:
+                return None, "unknown", False
+
+        # Detect language
+        detected_language = self.detect_language(content)
+        self.logger.info(f"Detected language: {detected_language}")
+
+        # Process based on configuration and detected language
+        if (
+            self.config.auto_translate
+            and detected_language == "en"
+            and self.config.target_language == "ja"
+        ):
+            # Translate English to Japanese
+            summary = self.summarize_and_translate(content, title, detected_language)
+            is_translated = True if summary else False
+        else:
+            # Normal summarization for Japanese or other languages
+            summary = self.summarize_content(content, title)
+            is_translated = False
+
+        if summary:
+            self.logger.info(
+                f"Successfully processed article {article_id} "
+                f"(language: {detected_language}, translated: {is_translated})"
+            )
+
+        return summary, detected_language, is_translated
 
     def is_available(self) -> bool:
         """Check if content fetching and summarization is available."""
