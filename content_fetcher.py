@@ -4,10 +4,13 @@ Content fetching and AI summarization module for Chirpy.
 Handles fetching article content from URLs and generating summaries using OpenAI API.
 """
 
+import time
 from typing import Any
 
 import requests  # type: ignore
 from bs4 import BeautifulSoup  # type: ignore
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 try:
     import openai  # type: ignore
@@ -20,6 +23,13 @@ except ImportError:
     detect = None  # type: ignore
 
 from config import ChirpyConfig, get_logger
+from error_handling import (
+    CircuitBreaker,
+    ErrorHandler,
+    create_retry_decorator,
+    is_recoverable_error,
+    get_user_friendly_message,
+)
 
 
 class ContentFetcher:
@@ -30,18 +40,68 @@ class ContentFetcher:
         self.config = config
         self.logger = get_logger(__name__)
         self.openai_client = None
+        
+        # Initialize error handling components
+        self.error_handler = ErrorHandler("content_fetcher")
+        self.openai_circuit_breaker = CircuitBreaker(
+            failure_threshold=config.circuit_breaker_failure_threshold,
+            timeout=config.circuit_breaker_timeout,
+            name="openai_api"
+        )
+        self.http_circuit_breaker = CircuitBreaker(
+            failure_threshold=config.circuit_breaker_failure_threshold,
+            timeout=config.circuit_breaker_timeout,
+            name="http_requests"
+        )
+        
+        # Create HTTP session with retry strategy
+        self.session = self._create_http_session()
+        
+        # Create retry decorator for API calls
+        self.retry_api_call = create_retry_decorator(
+            max_retries=config.max_retries,
+            backoff_multiplier=config.retry_backoff_multiplier,
+            min_wait=config.retry_min_wait,
+            max_wait=config.retry_max_wait,
+            retry_on=(openai.APIError, openai.APITimeoutError) if openai else ()
+        )
 
         if openai and config.openai_api_key:
             try:
-                self.openai_client = openai.OpenAI(api_key=config.openai_api_key)
+                self.openai_client = openai.OpenAI(
+                    api_key=config.openai_api_key,
+                    timeout=config.openai_timeout
+                )
                 self.logger.info("OpenAI client initialized successfully")
             except Exception as e:
-                self.logger.warning(f"Failed to initialize OpenAI client: {e}")
+                self.error_handler.handle_error(
+                    "openai_client_initialization", e, recoverable=False
+                )
         else:
             if not openai:
                 self.logger.warning("OpenAI package not available")
             if not config.openai_api_key:
                 self.logger.warning("OPENAI_API_KEY not found in configuration")
+    
+    def _create_http_session(self) -> requests.Session:
+        """Create a requests session with retry strategy."""
+        session = requests.Session()
+        
+        # Configure retry strategy
+        retry_strategy = Retry(
+            total=self.config.max_retries,
+            status_forcelist=[429, 500, 502, 503, 504],
+            method_whitelist=["HEAD", "GET", "OPTIONS"],
+            backoff_factor=self.config.retry_backoff_multiplier,
+            raise_on_status=False
+        )
+        
+        # Mount adapter with retry strategy
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        return session
 
     def detect_language(self, text: str) -> str:
         """
@@ -72,7 +132,7 @@ class ContentFetcher:
 
     def fetch_article_content(self, url: str) -> str | None:
         """
-        Fetch article content from URL.
+        Fetch article content from URL with comprehensive error handling.
 
         Args:
             url: Article URL to fetch content from
@@ -80,32 +140,78 @@ class ContentFetcher:
         Returns:
             Extracted article text or None if failed
         """
+        def _fetch_with_circuit_breaker() -> str | None:
+            """Internal fetch function with error handling."""
+            try:
+                self.logger.info(f"Fetching content from: {url[:60]}...")
+
+                # Set headers to mimic a real browser
+                headers = {
+                    "User-Agent": (
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/91.0.4472.124 Safari/537.36"
+                    ),
+                    "Accept": (
+                        "text/html,application/xhtml+xml,application/xml;"
+                        "q=0.9,image/webp,*/*;q=0.8"
+                    ),
+                    "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "Connection": "keep-alive",
+                    "Upgrade-Insecure-Requests": "1",
+                }
+
+                # Make request with session (includes retry logic)
+                response = self.session.get(
+                    url, 
+                    headers=headers, 
+                    timeout=self.config.request_timeout
+                )
+                response.raise_for_status()
+                
+                return self._extract_content_from_response(response)
+                
+            except requests.exceptions.Timeout as e:
+                self.error_handler.handle_error(
+                    "fetch_article_content_timeout", e, 
+                    context={"url": url, "timeout": self.config.request_timeout}
+                )
+                raise
+            except requests.exceptions.ConnectionError as e:
+                self.error_handler.handle_error(
+                    "fetch_article_content_connection", e,
+                    context={"url": url}
+                )
+                raise
+            except requests.exceptions.HTTPError as e:
+                recoverable = is_recoverable_error(e)
+                self.error_handler.handle_error(
+                    "fetch_article_content_http", e,
+                    recoverable=recoverable,
+                    context={"url": url, "status_code": getattr(e.response, 'status_code', None)}
+                )
+                raise
+            except Exception as e:
+                self.error_handler.handle_error(
+                    "fetch_article_content_unexpected", e,
+                    recoverable=is_recoverable_error(e),
+                    context={"url": url}
+                )
+                raise
+        
+        # Use circuit breaker for HTTP requests
         try:
-            self.logger.info(f"Fetching content from: {url[:60]}...")
-
-            # Set headers to mimic a real browser
-            headers = {
-                "User-Agent": (
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/91.0.4472.124 Safari/537.36"
-                ),
-                "Accept": (
-                    "text/html,application/xhtml+xml,application/xml;"
-                    "q=0.9,image/webp,*/*;q=0.8"
-                ),
-                "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
-                "Accept-Encoding": "gzip, deflate, br",
-                "Connection": "keep-alive",
-                "Upgrade-Insecure-Requests": "1",
-            }
-
-            # Make request with configured timeout
-            response = requests.get(
-                url, headers=headers, timeout=self.config.fetch_timeout
-            )
-            response.raise_for_status()
-
+            return self.http_circuit_breaker.call(_fetch_with_circuit_breaker)
+        except Exception as e:
+            # Log user-friendly message
+            friendly_message = get_user_friendly_message(e, "fetching article content")
+            self.logger.error(f"Content fetch failed: {friendly_message}")
+            return None
+    
+    def _extract_content_from_response(self, response: requests.Response) -> str | None:
+        """Extract text content from HTTP response."""
+        try:
             # Parse HTML content
             soup = BeautifulSoup(response.content, "html.parser")
 
@@ -155,17 +261,14 @@ class ContentFetcher:
             else:
                 self.logger.warning("No content found in HTML")
                 return None
-
-        except requests.RequestException as e:
-            self.logger.error(f"HTTP error fetching {url}: {e}")
-            return None
+                
         except Exception as e:
-            self.logger.error(f"Error fetching content from {url}: {e}")
+            self.logger.error(f"Error parsing HTML content: {e}")
             return None
 
     def summarize_content(self, content: str, title: str = "") -> str | None:
         """
-        Summarize content using OpenAI API.
+        Summarize content using OpenAI API with comprehensive error handling.
 
         Args:
             content: Article content to summarize
@@ -178,13 +281,15 @@ class ContentFetcher:
             self.logger.error("OpenAI client not available for summarization")
             return None
 
-        try:
-            self.logger.info(
-                f"Generating AI summary for content ({len(content)} chars)..."
-            )
+        def _summarize_with_circuit_breaker() -> str | None:
+            """Internal summarization function with error handling."""
+            try:
+                self.logger.info(
+                    f"Generating AI summary for content ({len(content)} chars)..."
+                )
 
-            # Create prompt for summarization
-            prompt = f"""
+                # Create prompt for summarization
+                prompt = f"""
 Please summarize the following article in Japanese. Create a concise but
 comprehensive summary that captures the main points and key information.
 
@@ -196,35 +301,78 @@ Please provide a summary in 2-3 paragraphs that would be suitable
 for text-to-speech reading.
 """
 
-            # Call OpenAI API with configured settings
-            response = self.openai_client.chat.completions.create(
-                model=self.config.openai_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a helpful assistant that creates concise, "
-                            "accurate summaries of Japanese articles. Your summaries "
-                            "should be informative and suitable for audio reading."
-                        ),
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=self.config.openai_max_tokens,
-                temperature=self.config.openai_temperature,
-            )
+                # Call OpenAI API with configured settings and retry logic
+                @self.retry_api_call
+                def _make_api_call():
+                    return self.openai_client.chat.completions.create(
+                        model=self.config.openai_model,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": (
+                                    "You are a helpful assistant that creates concise, "
+                                    "accurate summaries of Japanese articles. Your summaries "
+                                    "should be informative and suitable for audio reading."
+                                ),
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        max_tokens=self.config.openai_max_tokens,
+                        temperature=self.config.openai_temperature,
+                    )
 
-            summary = response.choices[0].message.content
-            if summary:
-                summary = summary.strip()
-                self.logger.info(f"AI summary generated: {len(summary)} characters")
-                return str(summary)
-            else:
-                self.logger.error("Empty response from OpenAI")
-                return None
+                response = _make_api_call()
+                
+                summary = response.choices[0].message.content
+                if summary:
+                    summary = summary.strip()
+                    self.logger.info(f"AI summary generated: {len(summary)} characters")
+                    return str(summary)
+                else:
+                    self.logger.error("Empty response from OpenAI")
+                    return None
 
+            except openai.RateLimitError as e:
+                self.error_handler.handle_error(
+                    "openai_summarize_rate_limit", e,
+                    context={"content_length": len(content), "title": title}
+                )
+                # Add delay for rate limiting
+                time.sleep(self.config.rate_limit_delay)
+                raise
+            except openai.APITimeoutError as e:
+                self.error_handler.handle_error(
+                    "openai_summarize_timeout", e,
+                    context={"content_length": len(content), "timeout": self.config.openai_timeout}
+                )
+                raise
+            except openai.AuthenticationError as e:
+                self.error_handler.handle_error(
+                    "openai_summarize_auth", e, recoverable=False
+                )
+                raise
+            except openai.APIError as e:
+                recoverable = is_recoverable_error(e)
+                self.error_handler.handle_error(
+                    "openai_summarize_api", e,
+                    recoverable=recoverable,
+                    context={"content_length": len(content)}
+                )
+                raise
+            except Exception as e:
+                self.error_handler.handle_error(
+                    "openai_summarize_unexpected", e,
+                    recoverable=is_recoverable_error(e),
+                    context={"content_length": len(content)}
+                )
+                raise
+
+        # Use circuit breaker for OpenAI API calls
+        try:
+            return self.openai_circuit_breaker.call(_summarize_with_circuit_breaker)
         except Exception as e:
-            self.logger.error(f"Error generating summary: {e}")
+            friendly_message = get_user_friendly_message(e, "generating AI summary")
+            self.logger.error(f"Summary generation failed: {friendly_message}")
             return None
 
     def summarize_and_translate(
