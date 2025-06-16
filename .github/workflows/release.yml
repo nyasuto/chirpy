@@ -35,7 +35,10 @@ jobs:
             link TEXT UNIQUE,
             published TEXT,
             summary TEXT,
-            embedded INTEGER DEFAULT 0
+            embedded INTEGER DEFAULT 0,
+            detected_language TEXT DEFAULT 'unknown',
+            original_summary TEXT,
+            is_translated INTEGER DEFAULT 0
         );
         INSERT INTO articles (title, link, published, summary) VALUES 
         ('Test Article 1', 'https://example.com/1', '2025-06-15T10:00:00+09:00', 'Test summary 1'),
