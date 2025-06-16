@@ -136,7 +136,7 @@ class ChirpyReader:
             and self.config.auto_translate
         ):
             try:
-                title_preview = article.get('title', '')[:50]
+                title_preview = article.get("title", "")[:50]
                 self.logger.info(
                     f"Detecting language for article {article_id}: {title_preview}..."
                 )
