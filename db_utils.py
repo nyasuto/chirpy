@@ -376,9 +376,7 @@ class DatabaseManager:
             language_counts = {row[0]: row[1] for row in cursor.fetchall()}
 
             # Count translated articles
-            cursor.execute(
-                "SELECT COUNT(*) FROM articles WHERE is_translated = 1"
-            )
+            cursor.execute("SELECT COUNT(*) FROM articles WHERE is_translated = 1")
             translated_count = cursor.fetchone()[0]
 
             # Count untranslated non-Japanese articles
