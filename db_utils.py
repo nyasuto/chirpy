@@ -42,7 +42,8 @@ class DatabaseManager:
             cursor = conn.cursor()
 
             query = """
-                SELECT a.id, a.title, a.link, a.published, a.summary, a.embedded
+                SELECT a.id, a.title, a.link, a.published, a.summary, a.embedded,
+                       a.detected_language, a.original_summary, a.is_translated
                 FROM articles a
                 LEFT JOIN read_articles r ON a.id = r.article_id
                 WHERE r.article_id IS NULL

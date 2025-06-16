@@ -110,10 +110,87 @@ class ChirpyReader:
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             self.logger.error(f"Text-to-speech not available: {e}")
 
+    def process_article_for_reading(self, article: dict[str, Any]) -> dict[str, Any]:
+        """
+        Process article with on-demand language detection and translation.
+
+        Args:
+            article: Article dictionary from database
+
+        Returns:
+            Updated article dictionary with translated content if needed
+        """
+        article_id = article.get("id")
+        if not isinstance(article_id, int):
+            return article
+        detected_language = article.get("detected_language", "unknown")
+        summary = article.get("summary", "")
+
+        # If language is unknown and we have content, detect and translate
+        if (
+            detected_language == "unknown"
+            and summary
+            and summary.strip()
+            and summary != "No summary available"
+            and self.content_fetcher.is_available()
+            and self.config.auto_translate
+        ):
+            try:
+                title_preview = article.get("title", "")[:50]
+                self.logger.info(
+                    f"Detecting language for article {article_id}: {title_preview}..."
+                )
+
+                # Process with translation workflow
+                result = self.content_fetcher.process_article_with_translation(article)
+                translated_summary, detected_lang, is_translated = result
+
+                if translated_summary and is_translated:
+                    # Update database with translation
+                    original_summary = article.get("summary", "")
+                    self.db.update_article_summary(article_id, translated_summary)
+                    self.db.update_article_language_info(
+                        article_id, detected_lang, original_summary, True
+                    )
+                    # Update article dict for immediate use
+                    article["summary"] = translated_summary
+                    article["detected_language"] = detected_lang
+                    article["is_translated"] = True
+                    article["original_summary"] = original_summary
+
+                    self.logger.info(
+                        f"✅ Article {article_id} translated from {detected_lang} to ja"
+                    )
+
+                elif detected_lang != "unknown":
+                    # Update language info even if no translation needed
+                    self.db.update_article_language_info(
+                        article_id, detected_lang, None, False
+                    )
+                    article["detected_language"] = detected_lang
+                    article["is_translated"] = False
+
+                    self.logger.info(
+                        f"ℹ️  Article {article_id} detected as {detected_lang}"
+                    )
+
+            except Exception as e:
+                self.logger.warning(
+                    f"Failed to process article {article_id} for translation: {e}"
+                )
+
+        return article
+
     def format_article_content(self, article: dict[str, Any]) -> str:
         """Format article content for speech."""
         title = article.get("title", "No title")
         summary = article.get("summary", "No summary available")
+        detected_language = article.get("detected_language", "unknown")
+        is_translated = article.get("is_translated", False)
+
+        # Add language info to title if translated
+        if is_translated and detected_language == "en":
+            title = f"{title} (英語記事 → 日本語翻訳済み)"
 
         # Clean up the summary text for better speech
         summary = summary.replace("\n", " ").replace("\r", " ")
@@ -240,8 +317,11 @@ class ChirpyReader:
                 self.logger.debug(f"Link: {article['link']}")
                 self.logger.debug(f"Published: {article['published']}")
 
+                # Process article for language detection and translation if needed
+                processed_article = self.process_article_for_reading(article)
+
                 # Format and speak the article
-                content = self.format_article_content(article)
+                content = self.format_article_content(processed_article)
                 self.speak_text(content)
 
                 # Mark as read if configured
