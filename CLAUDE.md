@@ -12,6 +12,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 このプロセスにより、プロジェクトのルールを継続的に改善していきます。
 
+## GitHub Issue管理ルール
+
+### 必須ラベル設定
+Issueを作成・更新する際は、以下のラベルを必ず設定する：
+
+#### Priority Labels（優先度）
+- `priority: critical` - 緊急対応が必要（アプリケーション停止、セキュリティ問題など）
+- `priority: high` - 高優先度（主要機能、重要なバグ修正など）
+- `priority: medium` - 中優先度（機能改善、マイナーバグなど）
+- `priority: low` - 低優先度（将来的な機能、ドキュメント改善など）
+
+#### Type Labels（種類）
+- `type: feature` - 新機能の追加
+- `type: bug` - バグ修正
+- `type: enhancement` - 既存機能の改善
+- `type: docs` - ドキュメント関連
+- `type: test` - テスト関連
+- `type: refactor` - リファクタリング
+- `type: ci/cd` - CI/CD関連
+- `type: security` - セキュリティ関連
+
+### ラベル適用例
+```
+title: "Add retry mechanism for API calls"
+labels: ["priority: high", "type: enhancement"]
+
+title: "Fix crash when database is missing"  
+labels: ["priority: critical", "type: bug"]
+
+title: "Add web interface"
+labels: ["priority: low", "type: feature"]
+```
+
 ## Project Overview
 
 Chirpy is an MVP RSS reader with text-to-speech functionality. It reads articles from a local SQLite database and provides audio narration of article titles and summaries.
