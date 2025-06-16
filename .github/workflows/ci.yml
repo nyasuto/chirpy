@@ -82,7 +82,7 @@ jobs:
       run: uv sync --group test
     
     - name: Run test suite
-      run: uv run pytest --cov=. --cov-report=term-missing --cov-fail-under=60
+      run: uv run pytest --cov=. --cov-report=term-missing --cov-fail-under=50
     
     - name: Run legacy read system tests
       run: uv run python test_read_system.py

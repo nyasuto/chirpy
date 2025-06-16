@@ -18,7 +18,7 @@ class TestChirpyConfig:
     def test_default_config_creation(self):
         """Test creating config with default values."""
         config = ChirpyConfig()
-        
+
         assert config.database_path == "data/articles.db"
         assert config.max_articles == 3
         assert config.max_summary_length == 500
@@ -38,27 +38,30 @@ class TestChirpyConfig:
             tts_rate=200,
             speech_enabled=False,
         )
-        
+
         assert config.database_path == "/custom/path.db"
         assert config.max_articles == 5
         assert config.openai_api_key == "test-key"
         assert config.tts_rate == 200
         assert config.speech_enabled is False
 
-    @patch.dict(os.environ, {
-        "CHIRPY_DATABASE_PATH": "/env/test.db",
-        "CHIRPY_MAX_ARTICLES": "10",
-        "OPENAI_API_KEY": "env-api-key",
-        "OPENAI_MODEL": "gpt-4o",
-        "TTS_RATE": "220",
-        "SPEECH_ENABLED": "false",
-        "AUTO_TRANSLATE": "false",
-        "TARGET_LANGUAGE": "en",
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "CHIRPY_DATABASE_PATH": "/env/test.db",
+            "CHIRPY_MAX_ARTICLES": "10",
+            "OPENAI_API_KEY": "env-api-key",
+            "OPENAI_MODEL": "gpt-4o",
+            "TTS_RATE": "220",
+            "SPEECH_ENABLED": "false",
+            "AUTO_TRANSLATE": "false",
+            "TARGET_LANGUAGE": "en",
+        },
+    )
     def test_config_from_env(self):
         """Test loading config from environment variables."""
         config = ChirpyConfig.from_env()
-        
+
         assert config.database_path == "/env/test.db"
         assert config.max_articles == 10
         assert config.openai_api_key == "env-api-key"
@@ -106,13 +109,14 @@ OPENAI_API_KEY=dotenv-api-key
 TTS_RATE=190
 SPEECH_ENABLED=false
 """)
-        
+
         with patch.dict(os.environ, {}, clear=True):
             # Clear env and load from file
             from dotenv import load_dotenv
+
             load_dotenv(env_file)
             config = ChirpyConfig.from_env()
-        
+
         assert config.database_path == "/dotenv/test.db"
         assert config.max_articles == 7
         assert config.openai_api_key == "dotenv-api-key"
@@ -130,7 +134,7 @@ SPEECH_ENABLED=false
         # Negative max articles should be invalid
         with pytest.raises(ValueError, match="max_articles must be positive"):
             ChirpyConfig(max_articles=0)
-        
+
         with pytest.raises(ValueError, match="max_articles must be positive"):
             ChirpyConfig(max_articles=-1)
 
@@ -139,7 +143,7 @@ SPEECH_ENABLED=false
         # Out of range TTS rate should be invalid
         with pytest.raises(ValueError, match="tts_rate must be between 50 and 500"):
             ChirpyConfig(tts_rate=49)
-        
+
         with pytest.raises(ValueError, match="tts_rate must be between 50 and 500"):
             ChirpyConfig(tts_rate=501)
 
@@ -148,17 +152,21 @@ SPEECH_ENABLED=false
         # Out of range volume should be invalid
         with pytest.raises(ValueError, match="tts_volume must be between 0.0 and 1.0"):
             ChirpyConfig(tts_volume=-0.1)
-        
+
         with pytest.raises(ValueError, match="tts_volume must be between 0.0 and 1.0"):
             ChirpyConfig(tts_volume=1.1)
 
     def test_config_validation_openai_temperature(self):
         """Test OpenAI temperature validation."""
         # Out of range temperature should be invalid
-        with pytest.raises(ValueError, match="openai_temperature must be between 0.0 and 2.0"):
+        with pytest.raises(
+            ValueError, match="openai_temperature must be between 0.0 and 2.0"
+        ):
             ChirpyConfig(openai_temperature=-0.1)
-        
-        with pytest.raises(ValueError, match="openai_temperature must be between 0.0 and 2.0"):
+
+        with pytest.raises(
+            ValueError, match="openai_temperature must be between 0.0 and 2.0"
+        ):
             ChirpyConfig(openai_temperature=2.1)
 
     def test_config_validation_openai_max_tokens(self):
@@ -166,18 +174,16 @@ SPEECH_ENABLED=false
         # Invalid max tokens should be invalid
         with pytest.raises(ValueError, match="openai_max_tokens must be positive"):
             ChirpyConfig(openai_max_tokens=0)
-        
+
         with pytest.raises(ValueError, match="openai_max_tokens must be positive"):
             ChirpyConfig(openai_max_tokens=-1)
 
     def test_config_str_representation(self):
         """Test config string representation."""
         config = ChirpyConfig(
-            database_path="/test.db",
-            max_articles=5,
-            openai_api_key="test-key"
+            database_path="/test.db", max_articles=5, openai_api_key="test-key"
         )
-        
+
         config_str = str(config)
         assert "ChirpyConfig" in config_str
         assert "/test.db" in config_str
@@ -189,7 +195,7 @@ SPEECH_ENABLED=false
     def test_config_repr_representation(self):
         """Test config repr representation."""
         config = ChirpyConfig(database_path="/test.db", max_articles=5)
-        
+
         config_repr = repr(config)
         assert "ChirpyConfig" in config_repr
         assert "/test.db" in config_repr

@@ -16,7 +16,7 @@ class TestChirpyConfigSimple:
     def test_default_config_creation(self):
         """Test creating config with default values."""
         config = ChirpyConfig()
-        
+
         assert config.database_path == "data/articles.db"
         assert config.max_articles == 3
         assert config.max_summary_length == 500
@@ -36,27 +36,30 @@ class TestChirpyConfigSimple:
             tts_rate=200,
             speech_enabled=False,
         )
-        
+
         assert config.database_path == "/custom/path.db"
         assert config.max_articles == 5
         assert config.openai_api_key == "test-key"
         assert config.tts_rate == 200
         assert config.speech_enabled is False
 
-    @patch.dict(os.environ, {
-        "CHIRPY_DATABASE_PATH": "/env/test.db",
-        "CHIRPY_MAX_ARTICLES": "10",
-        "OPENAI_API_KEY": "env-api-key",
-        "OPENAI_MODEL": "gpt-4o",
-        "TTS_RATE": "220",
-        "SPEECH_ENABLED": "false",
-        "AUTO_TRANSLATE": "false",
-        "TARGET_LANGUAGE": "en",
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "CHIRPY_DATABASE_PATH": "/env/test.db",
+            "CHIRPY_MAX_ARTICLES": "10",
+            "OPENAI_API_KEY": "env-api-key",
+            "OPENAI_MODEL": "gpt-4o",
+            "TTS_RATE": "220",
+            "SPEECH_ENABLED": "false",
+            "AUTO_TRANSLATE": "false",
+            "TARGET_LANGUAGE": "en",
+        },
+    )
     def test_config_from_env(self):
         """Test loading config from environment variables."""
         config = ChirpyConfig.from_env()
-        
+
         assert config.database_path == "/env/test.db"
         assert config.max_articles == 10
         assert config.openai_api_key == "env-api-key"
@@ -72,7 +75,7 @@ class TestChirpyConfigSimple:
             database_path="/test.db",
             max_articles=5,
         )
-        
+
         config_str = str(config)
         assert "ChirpyConfig" in config_str
         assert "/test.db" in config_str
@@ -80,7 +83,7 @@ class TestChirpyConfigSimple:
     def test_config_repr_representation(self):
         """Test config repr representation."""
         config = ChirpyConfig(database_path="/test.db", max_articles=5)
-        
+
         config_repr = repr(config)
         assert "ChirpyConfig" in config_repr
         assert "/test.db" in config_repr
@@ -91,22 +94,25 @@ class TestChirpyConfigSimple:
         with patch.dict(os.environ, {"SPEECH_ENABLED": "true"}):
             config = ChirpyConfig.from_env()
             assert config.speech_enabled is True
-            
+
         with patch.dict(os.environ, {"SPEECH_ENABLED": "false"}):
             config = ChirpyConfig.from_env()
             assert config.speech_enabled is False
-            
+
         with patch.dict(os.environ, {"AUTO_TRANSLATE": "True"}):
             config = ChirpyConfig.from_env()
             assert config.auto_translate is True
 
     def test_int_env_var_parsing(self):
         """Test parsing integer environment variables."""
-        with patch.dict(os.environ, {
-            "CHIRPY_MAX_ARTICLES": "15",
-            "TTS_RATE": "250",
-            "OPENAI_MAX_TOKENS": "1000"
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "CHIRPY_MAX_ARTICLES": "15",
+                "TTS_RATE": "250",
+                "OPENAI_MAX_TOKENS": "1000",
+            },
+        ):
             config = ChirpyConfig.from_env()
             assert config.max_articles == 15
             assert config.tts_rate == 250
@@ -114,10 +120,7 @@ class TestChirpyConfigSimple:
 
     def test_float_env_var_parsing(self):
         """Test parsing float environment variables."""
-        with patch.dict(os.environ, {
-            "TTS_VOLUME": "0.8",
-            "OPENAI_TEMPERATURE": "0.7"
-        }):
+        with patch.dict(os.environ, {"TTS_VOLUME": "0.8", "OPENAI_TEMPERATURE": "0.7"}):
             config = ChirpyConfig.from_env()
             assert config.tts_volume == 0.8
             assert config.openai_temperature == 0.7
@@ -130,45 +133,46 @@ class TestChirpyConfigSimple:
     def test_config_all_fields_present(self):
         """Test that all expected fields are present in config."""
         config = ChirpyConfig()
-        
+
         # Core settings
-        assert hasattr(config, 'database_path')
-        assert hasattr(config, 'max_articles')
-        assert hasattr(config, 'max_summary_length')
-        
+        assert hasattr(config, "database_path")
+        assert hasattr(config, "max_articles")
+        assert hasattr(config, "max_summary_length")
+
         # OpenAI settings
-        assert hasattr(config, 'openai_api_key')
-        assert hasattr(config, 'openai_model')
-        assert hasattr(config, 'openai_max_tokens')
-        assert hasattr(config, 'openai_temperature')
-        
+        assert hasattr(config, "openai_api_key")
+        assert hasattr(config, "openai_model")
+        assert hasattr(config, "openai_max_tokens")
+        assert hasattr(config, "openai_temperature")
+
         # TTS settings
-        assert hasattr(config, 'tts_engine')
-        assert hasattr(config, 'tts_rate')
-        assert hasattr(config, 'tts_volume')
-        assert hasattr(config, 'speech_enabled')
-        
+        assert hasattr(config, "tts_engine")
+        assert hasattr(config, "tts_rate")
+        assert hasattr(config, "tts_volume")
+        assert hasattr(config, "speech_enabled")
+
         # Translation settings
-        assert hasattr(config, 'auto_translate')
-        assert hasattr(config, 'target_language')
-        assert hasattr(config, 'preserve_original')
-        assert hasattr(config, 'translation_provider')
-        
+        assert hasattr(config, "auto_translate")
+        assert hasattr(config, "target_language")
+        assert hasattr(config, "preserve_original")
+        assert hasattr(config, "translation_provider")
+
         # Application settings
-        assert hasattr(config, 'auto_mark_read')
-        assert hasattr(config, 'pause_between_articles')
-        
+        assert hasattr(config, "auto_mark_read")
+        assert hasattr(config, "pause_between_articles")
+
         # Logging settings
-        assert hasattr(config, 'log_level')
-        assert hasattr(config, 'log_format')
-        assert hasattr(config, 'log_file')
+        assert hasattr(config, "log_level")
+        assert hasattr(config, "log_format")
+        assert hasattr(config, "log_file")
 
     def test_config_immutability_after_creation(self):
         """Test that config values can be modified after creation."""
         config = ChirpyConfig()
         original_path = config.database_path
-        
+
         # Config should be mutable (dataclass default)
         config.database_path = "/new/path.db"
         assert config.database_path == "/new/path.db"
         assert config.database_path != original_path
+

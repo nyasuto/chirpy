@@ -13,34 +13,36 @@ from pathlib import Path
 def run_tests():
     """Run the complete test suite."""
     print("🧪 Running Chirpy RSS Reader Test Suite\n")
-    
+
     # Ensure we're in the project directory
     project_root = Path(__file__).parent
-    
+
     try:
         # Run pytest with coverage
         cmd = [
-            "uv", "run", "pytest",
+            "uv",
+            "run",
+            "pytest",
             "--cov=.",
             "--cov-report=term-missing",
             "--cov-report=html",
             "--cov-fail-under=80",
             "-v",
             "--tb=short",
-            "tests/"
+            "tests/",
         ]
-        
+
         print(f"Running command: {' '.join(cmd)}")
         result = subprocess.run(cmd, cwd=project_root, check=False)
-        
+
         if result.returncode == 0:
             print("\n✅ All tests passed!")
             print("📊 Coverage report generated in htmlcov/")
         else:
             print(f"\n❌ Tests failed with exit code {result.returncode}")
-            
+
         return result.returncode
-        
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Error running tests: {e}")
         return 1
@@ -52,24 +54,27 @@ def run_tests():
 def run_unit_tests_only():
     """Run only unit tests."""
     print("🧪 Running Unit Tests Only\n")
-    
+
     project_root = Path(__file__).parent
-    
+
     try:
         cmd = [
-            "uv", "run", "pytest",
+            "uv",
+            "run",
+            "pytest",
             "--cov=.",
             "--cov-report=term-missing",
             "-v",
-            "-m", "unit",
-            "tests/unit/"
+            "-m",
+            "unit",
+            "tests/unit/",
         ]
-        
+
         print(f"Running command: {' '.join(cmd)}")
         result = subprocess.run(cmd, cwd=project_root, check=False)
-        
+
         return result.returncode
-        
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Error running unit tests: {e}")
         return 1
@@ -78,24 +83,27 @@ def run_unit_tests_only():
 def run_integration_tests_only():
     """Run only integration tests."""
     print("🧪 Running Integration Tests Only\n")
-    
+
     project_root = Path(__file__).parent
-    
+
     try:
         cmd = [
-            "uv", "run", "pytest",
+            "uv",
+            "run",
+            "pytest",
             "--cov=.",
             "--cov-report=term-missing",
             "-v",
-            "-m", "integration",
-            "tests/integration/"
+            "-m",
+            "integration",
+            "tests/integration/",
         ]
-        
+
         print(f"Running command: {' '.join(cmd)}")
         result = subprocess.run(cmd, cwd=project_root, check=False)
-        
+
         return result.returncode
-        
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Error running integration tests: {e}")
         return 1
@@ -112,5 +120,5 @@ if __name__ == "__main__":
             exit_code = 1
     else:
         exit_code = run_tests()
-    
+
     sys.exit(exit_code)

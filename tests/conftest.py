@@ -59,14 +59,19 @@ def test_config(test_db_path: Path) -> ChirpyConfig:
 @pytest.fixture
 def db_manager(test_config: ChirpyConfig) -> Generator[DatabaseManager, None, None]:
     """Create a test database manager with sample data."""
-    db = DatabaseManager(test_config.database_path)
+    # Create empty database file first
+    db_path = Path(test_config.database_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    db_path.touch()  # Create empty file
     
+    db = DatabaseManager(test_config.database_path)
+
     # Create tables
     _create_test_tables(db)
-    
+
     # Insert sample data
     _insert_sample_data(db)
-    
+
     yield db
 
 
@@ -155,14 +160,14 @@ def responses_mock():
             body="<html><body><p>Test article content</p></body></html>",
             status=200,
         )
-        
+
         # Mock failed article fetch
         rsps.add(
             responses.GET,
             "https://example.com/404",
             status=404,
         )
-        
+
         yield rsps
 
 
@@ -170,7 +175,7 @@ def _create_test_tables(db: DatabaseManager) -> None:
     """Create test database tables."""
     with db.get_connection() as conn:
         cursor = conn.cursor()
-        
+
         # Create articles table with all columns
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS articles (
@@ -185,7 +190,7 @@ def _create_test_tables(db: DatabaseManager) -> None:
                 is_translated INTEGER DEFAULT 0
             )
         """)
-        
+
         # Create read_articles table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS read_articles (
@@ -196,7 +201,7 @@ def _create_test_tables(db: DatabaseManager) -> None:
                 UNIQUE(article_id)
             )
         """)
-        
+
         conn.commit()
 
 
@@ -204,28 +209,76 @@ def _insert_sample_data(db: DatabaseManager) -> None:
     """Insert sample data into test database."""
     with db.get_connection() as conn:
         cursor = conn.cursor()
-        
+
         # Insert sample articles
         sample_data = [
-            (1, "Test Japanese Article", "https://example.com/jp1", 
-             "2025-06-16T10:00:00+09:00", "これは日本語のテスト記事です。", 0, "ja", None, 0),
-            (2, "Test English Article", "https://example.com/en1", 
-             "2025-06-16T11:00:00+09:00", "This is an English test article.", 0, "en", None, 0),
-            (3, "Unknown Language Article", "https://example.com/unknown", 
-             "2025-06-16T12:00:00+09:00", "Article with unknown language.", 0, "unknown", None, 0),
-            (4, "Empty Summary Article", "https://example.com/empty", 
-             "2025-06-16T13:00:00+09:00", "", 0, "unknown", None, 0),
-            (5, "Read Article", "https://example.com/read", 
-             "2025-06-16T14:00:00+09:00", "This article was already read.", 0, "en", None, 0),
+            (
+                1,
+                "Test Japanese Article",
+                "https://example.com/jp1",
+                "2025-06-16T10:00:00+09:00",
+                "これは日本語のテスト記事です。",
+                0,
+                "ja",
+                None,
+                0,
+            ),
+            (
+                2,
+                "Test English Article",
+                "https://example.com/en1",
+                "2025-06-16T11:00:00+09:00",
+                "This is an English test article.",
+                0,
+                "en",
+                None,
+                0,
+            ),
+            (
+                3,
+                "Unknown Language Article",
+                "https://example.com/unknown",
+                "2025-06-16T12:00:00+09:00",
+                "Article with unknown language.",
+                0,
+                "unknown",
+                None,
+                0,
+            ),
+            (
+                4,
+                "Empty Summary Article",
+                "https://example.com/empty",
+                "2025-06-16T13:00:00+09:00",
+                "",
+                0,
+                "unknown",
+                None,
+                0,
+            ),
+            (
+                5,
+                "Read Article",
+                "https://example.com/read",
+                "2025-06-16T14:00:00+09:00",
+                "This article was already read.",
+                0,
+                "en",
+                None,
+                0,
+            ),
         ]
-        
-        cursor.executemany("""
+
+        cursor.executemany(
+            """
             INSERT INTO articles 
             (id, title, link, published, summary, embedded, detected_language, original_summary, is_translated)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, sample_data)
-        
+        """,
+            sample_data,
+        )
+
         # Mark article 5 as read
         cursor.execute("INSERT INTO read_articles (article_id) VALUES (5)")
-        
+
         conn.commit()

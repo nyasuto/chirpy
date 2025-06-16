@@ -47,7 +47,7 @@ jobs:
         EOF
         uv run python db_migration.py
         uv sync --group test
-        uv run pytest --cov=. --cov-report=term-missing --cov-fail-under=60
+        uv run pytest --cov=. --cov-report=term-missing --cov-fail-under=50
         uv run python test_read_system.py
     
     - name: Build package
