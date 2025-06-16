@@ -7,7 +7,9 @@ Reads articles from SQLite database and provides audio narration.
 """
 
 import logging
+import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -17,10 +19,12 @@ try:
 except ImportError:
     pyttsx3 = None
 
+
 from cli import apply_args_to_config, handle_special_modes, parse_args
 from config import ChirpyConfig, get_logger, initialize_app_logging
 from content_fetcher import ContentFetcher
 from db_utils import DatabaseManager
+from interactive_ui import ArticleSelector, InteractiveController, ProgressTracker
 
 
 class ChirpyReader:
@@ -40,6 +44,20 @@ class ChirpyReader:
         self.db = DatabaseManager(str(self.db_path))
         self.tts_engine = self._initialize_tts()
         self.content_fetcher = ContentFetcher(config)
+
+        # Interactive UI components
+        self.interactive_controller = (
+            InteractiveController(config) if config.interactive_mode else None
+        )
+        self.article_selector = ArticleSelector(config)
+        self.progress_tracker = ProgressTracker(config)
+
+        # Playback control state
+        self.is_paused = False
+        self.should_skip = False
+        self.should_stop = False
+        self.current_speed_multiplier = 1.0
+        self.playback_lock = threading.Lock()
 
     def _initialize_tts(self) -> pyttsx3.Engine | None:
         """Initialize text-to-speech engine."""
@@ -78,7 +96,7 @@ class ChirpyReader:
             return None
 
     def speak_text(self, text: str) -> None:
-        """Speak the given text using available TTS method."""
+        """Speak text using available TTS method with interactive controls."""
         if not text.strip():
             return
 
@@ -86,29 +104,140 @@ class ChirpyReader:
             self.logger.debug("Speech disabled, skipping TTS")
             return
 
+        # Check for stop signal
+        with self.playback_lock:
+            if self.should_stop:
+                return
+
         self.logger.info(f"Speaking: {text[:100]}{'...' if len(text) > 100 else ''}")
 
+        # Split text into sentences for pause/resume support
+        sentences = self._split_text_for_playback(text)
+
+        for sentence in sentences:
+            with self.playback_lock:
+                if self.should_stop:
+                    return
+                if self.should_skip:
+                    self.should_skip = False  # Reset skip flag
+                    return
+
+                # Wait while paused
+                while self.is_paused and not self.should_stop:
+                    time.sleep(0.1)
+
+                if self.should_stop:
+                    return
+
+            # Apply speed adjustment
+            adjusted_rate = int(self.config.tts_rate * self.current_speed_multiplier)
+
+            # Try TTS engine first
+            if self.tts_engine:
+                try:
+                    # Update rate for current sentence
+                    self.tts_engine.setProperty("rate", adjusted_rate)
+                    self.tts_engine.setProperty("volume", self.config.tts_volume)
+                    self.tts_engine.say(sentence)
+                    self.tts_engine.runAndWait()
+                    continue
+                except Exception as e:
+                    self.logger.warning(
+                        f"TTS engine error: {e}, falling back to 'say' command"
+                    )
+
+            # Fallback to system 'say' command
+            try:
+                rate_arg = ["-r", str(adjusted_rate)] if adjusted_rate != 180 else []
+                subprocess.run(
+                    ["say"] + rate_arg + [sentence],
+                    check=True,
+                    capture_output=True,
+                    timeout=30
+                )
+            except (
+                subprocess.CalledProcessError,
+                FileNotFoundError,
+                subprocess.TimeoutExpired,
+            ) as e:
+                self.logger.error(f"Text-to-speech not available: {e}")
+                break
+
+    def _split_text_for_playback(self, text: str) -> list[str]:
+        """Split text into manageable chunks for interactive playback."""
+        # Split by sentences, but keep reasonable chunk sizes
+        import re
+        sentences = re.split(r'[.!?]+', text)
+        chunks = []
+        current_chunk = ""
+
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+
+            # If adding this sentence would make chunk too long, start new chunk
+            if len(current_chunk) + len(sentence) > 200 and current_chunk:
+                chunks.append(current_chunk)
+                current_chunk = sentence
+            else:
+                if current_chunk:
+                    current_chunk += ". " + sentence
+                else:
+                    current_chunk = sentence
+
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks if chunks else [text]
+
+    def _setup_interactive_controls(self) -> None:
+        """Set up interactive control callbacks."""
+        if self.interactive_controller:
+            self.interactive_controller.set_callbacks(
+                pause=self._pause_playback,
+                resume=self._resume_playback,
+                skip=self._skip_current,
+                speed=self._adjust_speed,
+                volume=self._adjust_volume,
+                stop=self._stop_playback
+            )
+
+    def _pause_playback(self) -> None:
+        """Pause current playback."""
+        with self.playback_lock:
+            self.is_paused = True
+
+    def _resume_playback(self) -> None:
+        """Resume paused playback."""
+        with self.playback_lock:
+            self.is_paused = False
+
+    def _skip_current(self) -> None:
+        """Skip current article."""
+        with self.playback_lock:
+            self.should_skip = True
+            self.is_paused = False  # Resume if paused
+
+    def _adjust_speed(self, multiplier: float) -> None:
+        """Adjust playback speed."""
+        with self.playback_lock:
+            self.current_speed_multiplier = multiplier
+
+    def _adjust_volume(self, volume: float) -> None:
+        """Adjust playback volume."""
+        self.config.tts_volume = volume
         if self.tts_engine:
             try:
-                self.tts_engine.say(text)
-                self.tts_engine.runAndWait()
-                return
+                self.tts_engine.setProperty("volume", volume)
             except Exception as e:
-                self.logger.warning(
-                    f"TTS engine error: {e}, falling back to 'say' command"
-                )
+                self.logger.debug(f"Failed to adjust TTS volume: {e}")
 
-        # Use configured TTS engine or fallback to macOS 'say' command
-        import subprocess
-
-        try:
-            if self.config.tts_engine == "say":
-                subprocess.run(["say", text], check=True, capture_output=True)
-            else:
-                # Default fallback
-                subprocess.run(["say", text], check=True, capture_output=True)
-        except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            self.logger.error(f"Text-to-speech not available: {e}")
+    def _stop_playback(self) -> None:
+        """Stop playback completely."""
+        with self.playback_lock:
+            self.should_stop = True
+            self.is_paused = False
 
     def process_article_for_reading(self, article: dict[str, Any]) -> dict[str, Any]:
         """
@@ -279,6 +408,10 @@ class ChirpyReader:
         self.logger.info("Chirpy RSS Reader Starting...")
 
         try:
+            # Setup interactive controls if enabled
+            if self.interactive_controller:
+                self._setup_interactive_controls()
+
             # Get database statistics
             stats = self.db.get_database_stats()
             self.logger.info("Database Stats:")
@@ -292,30 +425,62 @@ class ChirpyReader:
                 self.speak_text("No unread articles found. All caught up!")
                 return
 
-            # Get the latest unread articles
-            self.logger.info(
-                f"Fetching {self.config.max_articles} latest unread articles..."
-            )
-            articles = self.db.get_unread_articles(limit=self.config.max_articles)
+            # Get all unread articles for selection
+            # Get more articles for selection
+            all_articles = self.db.get_unread_articles(limit=50)
 
-            if not articles:
+            if not all_articles:
                 self.logger.warning("No unread articles with content found")
                 return
 
-            self.logger.info(f"Found {len(articles)} unread articles to read")
+            # Article selection
+            if self.config.select_articles:
+                selected_indices = self.article_selector.show_article_menu(all_articles)
+                articles = [all_articles[i] for i in selected_indices]
+            else:
+                articles = all_articles[:self.config.max_articles]
+
+            if not articles:
+                self.logger.info("No articles selected for reading")
+                return
+
+            self.logger.info(f"Found {len(articles)} articles to read")
+
+            # Start interactive session if enabled
+            if self.interactive_controller:
+                self.interactive_controller.start_session(len(articles))
+
+            # Start progress tracking
+            self.progress_tracker.session_start = time.time()
 
             # Introduction
             intro_text = (
-                f"Welcome to Chirpy! I found {len(articles)} unread articles "
+                f"Welcome to Chirpy! I found {len(articles)} articles "
                 "to read for you."
             )
+            if self.interactive_controller:
+                intro_text += " Press H for keyboard shortcuts."
+
             self.speak_text(intro_text)
 
             # Read each article
-            for i, article in enumerate(articles, 1):
-                self.logger.info(f"Article {i} of {len(articles)}: {article['title']}")
+            for i, article in enumerate(articles):
+                # Check for stop signal
+                with self.playback_lock:
+                    if self.should_stop:
+                        break
+
+                self.logger.info(
+                    f"Article {i + 1} of {len(articles)}: {article['title']}"
+                )
                 self.logger.debug(f"Link: {article['link']}")
                 self.logger.debug(f"Published: {article['published']}")
+
+                # Update progress tracking and UI
+                if self.interactive_controller:
+                    self.interactive_controller.update_progress(i, article['title'])
+
+                self.progress_tracker.update_statistics(article)
 
                 # Process article for language detection and translation if needed
                 processed_article = self.process_article_for_reading(article)
@@ -323,6 +488,14 @@ class ChirpyReader:
                 # Format and speak the article
                 content = self.format_article_content(processed_article)
                 self.speak_text(content)
+
+                # Check if we should skip to next article
+                with self.playback_lock:
+                    if self.should_skip:
+                        self.should_skip = False
+                        continue
+                    if self.should_stop:
+                        break
 
                 # Mark as read if configured
                 if self.config.auto_mark_read:
@@ -334,20 +507,37 @@ class ChirpyReader:
                         )
 
                 # Pause between articles (except for the last one)
-                if i < len(articles) and self.config.pause_between_articles:
+                if i < len(articles) - 1 and self.config.pause_between_articles:
                     self.logger.debug("Pausing between articles...")
-                    time.sleep(2)
+
+                    # Interactive pause - can be interrupted
+                    pause_start = time.time()
+                    while time.time() - pause_start < 2:
+                        with self.playback_lock:
+                            if self.should_stop or self.should_skip:
+                                break
+                        time.sleep(0.1)
+
+            # Show session summary
+            self.progress_tracker.show_session_summary()
 
             # Conclusion
-            conclusion_text = (
-                f"That's all for now! I've read {len(articles)} articles for you."
-            )
-            self.logger.info("Session complete!")
-            self.speak_text(conclusion_text)
+            if not self.should_stop:
+                conclusion_text = (
+                    f"That's all for now! I've read {len(articles)} articles for you."
+                )
+                self.logger.info("Session complete!")
+                self.speak_text(conclusion_text)
+
+            # End interactive session
+            if self.interactive_controller:
+                self.interactive_controller.end_session()
 
         except Exception as e:
             self.logger.error(f"An error occurred: {e}")
             self.speak_text("Sorry, an error occurred while reading articles.")
+            if self.interactive_controller:
+                self.interactive_controller.end_session()
             sys.exit(1)
 
     def run(self) -> None:

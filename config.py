@@ -50,6 +50,8 @@ class ChirpyConfig:
     auto_mark_read: bool = True
     pause_between_articles: bool = True
     speech_enabled: bool = True
+    interactive_mode: bool = False
+    select_articles: bool = False
 
     # Translation settings
     auto_translate: bool = True
@@ -68,6 +70,14 @@ class ChirpyConfig:
         self.tts_rate = max(50, min(500, self.tts_rate))
         self.tts_volume = max(0.0, min(1.0, self.tts_volume))
         self.openai_temperature = max(0.0, min(2.0, self.openai_temperature))
+
+    def update_from_dict(self, updates: dict[str, Any]) -> None:
+        """Update configuration from dictionary."""
+        for key, value in updates.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+        # Re-run validation
+        self.__post_init__()
 
     @classmethod
     def from_env(cls) -> "ChirpyConfig":
@@ -98,6 +108,7 @@ class ChirpyConfig:
             auto_mark_read=os.getenv("AUTO_MARK_READ", "true").lower() == "true",
             pause_between_articles=os.getenv("PAUSE_BETWEEN_ARTICLES", "true").lower()
             == "true",
+            interactive_mode=os.getenv("INTERACTIVE_MODE", "false").lower() == "true",
             speech_enabled=os.getenv("SPEECH_ENABLED", "true").lower() == "true",
             auto_translate=os.getenv("AUTO_TRANSLATE", "true").lower() == "true",
             target_language=os.getenv("TARGET_LANGUAGE", "ja"),
@@ -111,14 +122,6 @@ class ChirpyConfig:
             field.name: getattr(self, field.name)
             for field in self.__dataclass_fields__.values()
         }
-
-    def update_from_dict(self, updates: dict[str, Any]) -> None:
-        """Update configuration from dictionary."""
-        for key, value in updates.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-        # Re-run validation
-        self.__post_init__()
 
 
 class ChirpyLogger:
