@@ -26,7 +26,7 @@ class ChirpyConfig:
 
     # OpenAI API settings
     openai_api_key: str | None = None
-    openai_model: str = "gpt-3.5-turbo"
+    openai_model: str = "gpt-4o"
     openai_max_tokens: int = 500
     openai_temperature: float = 0.3
 
