@@ -39,7 +39,7 @@ class DatabaseManager:
         Raises:
             sqlite3.Error: If connection fails after all retries
         """
-        last_error = None
+        last_error: sqlite3.Error | None = None
 
         for attempt in range(max_retries):
             try:
@@ -79,7 +79,7 @@ class DatabaseManager:
                     raise
 
             except Exception as e:
-                last_error = e
+                last_error = sqlite3.Error(str(e))
                 self.error_handler.handle_error(
                     "database_connection_unexpected",
                     e,
@@ -179,7 +179,7 @@ class DatabaseManager:
             )
 
             if success and result:
-                return result[0] == "ok"
+                return bool(result[0] == "ok")
 
             return False
 

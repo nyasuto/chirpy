@@ -90,7 +90,7 @@ class ContentFetcher:
         retry_strategy = Retry(
             total=self.config.max_retries,
             status_forcelist=[429, 500, 502, 503, 504],
-            method_whitelist=["HEAD", "GET", "OPTIONS"],
+            allowed_methods=["HEAD", "GET", "OPTIONS"],
             backoff_factor=self.config.retry_backoff_multiplier,
             raise_on_status=False,
         )
@@ -306,7 +306,9 @@ for text-to-speech reading.
 
                 # Call OpenAI API with configured settings and retry logic
                 @self.retry_api_call
-                def _make_api_call():
+                def _make_api_call() -> Any:
+                    if self.openai_client is None:
+                        raise ValueError("OpenAI client not initialized")
                     return self.openai_client.chat.completions.create(
                         model=self.config.openai_model,
                         messages=[

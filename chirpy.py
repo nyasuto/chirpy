@@ -104,7 +104,7 @@ class ChirpyReader:
         self.logger.info(f"Speaking: {text[:100]}{'...' if len(text) > 100 else ''}")
 
         # Try pyttsx3 engine first
-        if self.tts_engine:
+        if self.tts_engine is not None:
             if self._try_pyttsx3_with_timeout(text):
                 return
 
@@ -133,8 +133,9 @@ class ChirpyReader:
         for attempt in range(max_retries):
             try:
                 with timeout_context(self.config.tts_timeout, "pyttsx3 TTS"):
-                    self.tts_engine.say(text)
-                    self.tts_engine.runAndWait()
+                    if self.tts_engine is not None:
+                        self.tts_engine.say(text)
+                        self.tts_engine.runAndWait()
                     self.logger.debug("pyttsx3 TTS completed successfully")
                     return True
 

@@ -198,7 +198,7 @@ def create_retry_decorator(
         requests.RequestException,
         openai.APIError,
     ),
-):
+) -> Any:
     """
     Create a retry decorator with specified parameters.
 
