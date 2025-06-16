@@ -52,9 +52,39 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=.",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-fail-under=60"
+]
+markers = [
+    "unit: marks tests as unit tests",
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow running",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
 [dependency-groups]
 dev = [
     "mypy>=1.16.0",
     "ruff>=0.11.13",
     "types-keyboard>=0.13.2.20240310",
+]
+test = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.14.0",
+    "pytest-asyncio>=0.24.0",
+    "responses>=0.25.0",
 ]

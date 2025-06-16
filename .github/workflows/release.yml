@@ -46,6 +46,8 @@ jobs:
         ('Test Article 3', 'https://example.com/3', '2025-06-15T12:00:00+09:00', 'Test summary 3');
         EOF
         uv run python db_migration.py
+        uv sync --group test
+        uv run pytest --cov=. --cov-report=term-missing --cov-fail-under=60
         uv run python test_read_system.py
     
     - name: Build package

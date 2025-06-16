@@ -78,5 +78,11 @@ jobs:
     - name: Run database migration
       run: uv run python db_migration.py
     
-    - name: Run read system tests
+    - name: Install test dependencies
+      run: uv sync --group test
+    
+    - name: Run test suite
+      run: uv run pytest --cov=. --cov-report=term-missing --cov-fail-under=60
+    
+    - name: Run legacy read system tests
       run: uv run python test_read_system.py
