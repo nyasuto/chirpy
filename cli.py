@@ -138,6 +138,24 @@ For more information, see: https://github.com/nyasuto/chirpy
         help="Show current configuration and exit",
     )
 
+    # Translation options
+    translation_group = parser.add_argument_group("translation options")
+    translation_group.add_argument(
+        "--no-translate",
+        action="store_true",
+        help="Disable automatic translation of non-Japanese articles",
+    )
+    translation_group.add_argument(
+        "--target-language",
+        metavar="LANG",
+        help="Target language for translation (default: ja for Japanese)",
+    )
+    translation_group.add_argument(
+        "--translate-articles",
+        action="store_true",
+        help="Process existing articles for translation",
+    )
+
     # Application behavior
     behavior_group = parser.add_argument_group("application behavior")
     behavior_group.add_argument(
@@ -223,6 +241,13 @@ def apply_args_to_config(
     if args.log_file:
         updates["log_file"] = args.log_file
 
+    # Translation settings
+    if args.no_translate:
+        updates["auto_translate"] = False
+
+    if args.target_language:
+        updates["target_language"] = args.target_language
+
     # Application behavior
     if args.no_mark_read:
         updates["auto_mark_read"] = False
@@ -254,6 +279,12 @@ def show_config(config: ChirpyConfig) -> None:
         "Text-to-Speech": ["tts_engine", "tts_rate", "tts_volume"],
         "Content Fetching": ["fetch_timeout", "rate_limit_delay"],
         "Logging": ["log_level", "log_format", "log_file"],
+        "Translation": [
+            "auto_translate",
+            "target_language",
+            "preserve_original",
+            "translation_provider",
+        ],
         "Application Behavior": [
             "auto_mark_read",
             "pause_between_articles",
@@ -310,6 +341,60 @@ def handle_special_modes(args: argparse.Namespace, config: ChirpyConfig) -> bool
             print(f"  Unread: {unread_pct:.1f}%")
             print(f"  Empty summaries: {empty_pct:.1f}%")
 
+        return True
+
+    if args.translate_articles:
+        from content_fetcher import ContentFetcher
+        from db_utils import DatabaseManager
+
+        print("🔄 Processing articles for translation...")
+
+        db = DatabaseManager(config.database_path)
+        content_fetcher = ContentFetcher(config)
+
+        if not content_fetcher.is_available():
+            print("❌ OpenAI API not available for translation")
+            return True
+
+        # Get untranslated articles
+        untranslated = db.get_untranslated_articles(limit=config.max_articles)
+
+        if not untranslated:
+            print("✅ No articles requiring translation found")
+            return True
+
+        print(f"📋 Found {len(untranslated)} articles to process")
+
+        processed = 0
+        for article in untranslated:
+            try:
+                result = content_fetcher.process_article_with_translation(article)
+                summary, detected_lang, is_translated = result
+
+                if summary and is_translated:
+                    # Update database with translation
+                    original_summary = article.get("summary", "")
+                    db.update_article_summary(article["id"], summary)
+                    db.update_article_language_info(
+                        article["id"], detected_lang, original_summary, True
+                    )
+                    print(f"✅ Translated article {article['id']}")
+                    processed += 1
+                elif summary:
+                    # Update language info only
+                    db.update_article_language_info(
+                        article["id"], detected_lang, None, False
+                    )
+                    print(
+                        f"ℹ️  Processed article {article['id']} (no translation needed)"
+                    )
+                else:
+                    print(f"❌ Failed to process article {article['id']}")
+
+            except Exception as e:
+                print(f"❌ Error processing article {article['id']}: {e}")
+
+        print(f"\n🎉 Translation complete! {processed} articles translated")
         return True
 
     return False

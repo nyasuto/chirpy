@@ -51,6 +51,12 @@ class ChirpyConfig:
     pause_between_articles: bool = True
     speech_enabled: bool = True
 
+    # Translation settings
+    auto_translate: bool = True
+    target_language: str = "ja"
+    preserve_original: bool = True
+    translation_provider: str = "openai"
+
     def __post_init__(self) -> None:
         """Post-initialization processing."""
         # Convert string paths to Path objects if needed
@@ -93,6 +99,10 @@ class ChirpyConfig:
             pause_between_articles=os.getenv("PAUSE_BETWEEN_ARTICLES", "true").lower()
             == "true",
             speech_enabled=os.getenv("SPEECH_ENABLED", "true").lower() == "true",
+            auto_translate=os.getenv("AUTO_TRANSLATE", "true").lower() == "true",
+            target_language=os.getenv("TARGET_LANGUAGE", "ja"),
+            preserve_original=os.getenv("PRESERVE_ORIGINAL", "true").lower() == "true",
+            translation_provider=os.getenv("TRANSLATION_PROVIDER", "openai"),
         )
 
     def to_dict(self) -> dict[str, Any]:
