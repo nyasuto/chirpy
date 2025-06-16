@@ -27,8 +27,8 @@ from error_handling import (
     CircuitBreaker,
     ErrorHandler,
     create_retry_decorator,
-    is_recoverable_error,
     get_user_friendly_message,
+    is_recoverable_error,
 )
 
 
@@ -40,37 +40,36 @@ class ContentFetcher:
         self.config = config
         self.logger = get_logger(__name__)
         self.openai_client = None
-        
+
         # Initialize error handling components
         self.error_handler = ErrorHandler("content_fetcher")
         self.openai_circuit_breaker = CircuitBreaker(
             failure_threshold=config.circuit_breaker_failure_threshold,
             timeout=config.circuit_breaker_timeout,
-            name="openai_api"
+            name="openai_api",
         )
         self.http_circuit_breaker = CircuitBreaker(
             failure_threshold=config.circuit_breaker_failure_threshold,
             timeout=config.circuit_breaker_timeout,
-            name="http_requests"
+            name="http_requests",
         )
-        
+
         # Create HTTP session with retry strategy
         self.session = self._create_http_session()
-        
+
         # Create retry decorator for API calls
         self.retry_api_call = create_retry_decorator(
             max_retries=config.max_retries,
             backoff_multiplier=config.retry_backoff_multiplier,
             min_wait=config.retry_min_wait,
             max_wait=config.retry_max_wait,
-            retry_on=(openai.APIError, openai.APITimeoutError) if openai else ()
+            retry_on=(openai.APIError, openai.APITimeoutError) if openai else (),
         )
 
         if openai and config.openai_api_key:
             try:
                 self.openai_client = openai.OpenAI(
-                    api_key=config.openai_api_key,
-                    timeout=config.openai_timeout
+                    api_key=config.openai_api_key, timeout=config.openai_timeout
                 )
                 self.logger.info("OpenAI client initialized successfully")
             except Exception as e:
@@ -82,25 +81,25 @@ class ContentFetcher:
                 self.logger.warning("OpenAI package not available")
             if not config.openai_api_key:
                 self.logger.warning("OPENAI_API_KEY not found in configuration")
-    
+
     def _create_http_session(self) -> requests.Session:
         """Create a requests session with retry strategy."""
         session = requests.Session()
-        
+
         # Configure retry strategy
         retry_strategy = Retry(
             total=self.config.max_retries,
             status_forcelist=[429, 500, 502, 503, 504],
             method_whitelist=["HEAD", "GET", "OPTIONS"],
             backoff_factor=self.config.retry_backoff_multiplier,
-            raise_on_status=False
+            raise_on_status=False,
         )
-        
+
         # Mount adapter with retry strategy
         adapter = HTTPAdapter(max_retries=retry_strategy)
         session.mount("http://", adapter)
         session.mount("https://", adapter)
-        
+
         return session
 
     def detect_language(self, text: str) -> str:
@@ -140,6 +139,7 @@ class ContentFetcher:
         Returns:
             Extracted article text or None if failed
         """
+
         def _fetch_with_circuit_breaker() -> str | None:
             """Internal fetch function with error handling."""
             try:
@@ -164,42 +164,45 @@ class ContentFetcher:
 
                 # Make request with session (includes retry logic)
                 response = self.session.get(
-                    url, 
-                    headers=headers, 
-                    timeout=self.config.request_timeout
+                    url, headers=headers, timeout=self.config.request_timeout
                 )
                 response.raise_for_status()
-                
+
                 return self._extract_content_from_response(response)
-                
+
             except requests.exceptions.Timeout as e:
                 self.error_handler.handle_error(
-                    "fetch_article_content_timeout", e, 
-                    context={"url": url, "timeout": self.config.request_timeout}
+                    "fetch_article_content_timeout",
+                    e,
+                    context={"url": url, "timeout": self.config.request_timeout},
                 )
                 raise
             except requests.exceptions.ConnectionError as e:
                 self.error_handler.handle_error(
-                    "fetch_article_content_connection", e,
-                    context={"url": url}
+                    "fetch_article_content_connection", e, context={"url": url}
                 )
                 raise
             except requests.exceptions.HTTPError as e:
                 recoverable = is_recoverable_error(e)
                 self.error_handler.handle_error(
-                    "fetch_article_content_http", e,
+                    "fetch_article_content_http",
+                    e,
                     recoverable=recoverable,
-                    context={"url": url, "status_code": getattr(e.response, 'status_code', None)}
+                    context={
+                        "url": url,
+                        "status_code": getattr(e.response, "status_code", None),
+                    },
                 )
                 raise
             except Exception as e:
                 self.error_handler.handle_error(
-                    "fetch_article_content_unexpected", e,
+                    "fetch_article_content_unexpected",
+                    e,
                     recoverable=is_recoverable_error(e),
-                    context={"url": url}
+                    context={"url": url},
                 )
                 raise
-        
+
         # Use circuit breaker for HTTP requests
         try:
             return self.http_circuit_breaker.call(_fetch_with_circuit_breaker)
@@ -208,7 +211,7 @@ class ContentFetcher:
             friendly_message = get_user_friendly_message(e, "fetching article content")
             self.logger.error(f"Content fetch failed: {friendly_message}")
             return None
-    
+
     def _extract_content_from_response(self, response: requests.Response) -> str | None:
         """Extract text content from HTTP response."""
         try:
@@ -261,7 +264,7 @@ class ContentFetcher:
             else:
                 self.logger.warning("No content found in HTML")
                 return None
-                
+
         except Exception as e:
             self.logger.error(f"Error parsing HTML content: {e}")
             return None
@@ -311,8 +314,9 @@ for text-to-speech reading.
                                 "role": "system",
                                 "content": (
                                     "You are a helpful assistant that creates concise, "
-                                    "accurate summaries of Japanese articles. Your summaries "
-                                    "should be informative and suitable for audio reading."
+                                    "accurate summaries of Japanese articles. "
+                                    "Your summaries should be informative and suitable "
+                                    "for audio reading."
                                 ),
                             },
                             {"role": "user", "content": prompt},
@@ -322,7 +326,7 @@ for text-to-speech reading.
                     )
 
                 response = _make_api_call()
-                
+
                 summary = response.choices[0].message.content
                 if summary:
                     summary = summary.strip()
@@ -334,16 +338,21 @@ for text-to-speech reading.
 
             except openai.RateLimitError as e:
                 self.error_handler.handle_error(
-                    "openai_summarize_rate_limit", e,
-                    context={"content_length": len(content), "title": title}
+                    "openai_summarize_rate_limit",
+                    e,
+                    context={"content_length": len(content), "title": title},
                 )
                 # Add delay for rate limiting
                 time.sleep(self.config.rate_limit_delay)
                 raise
             except openai.APITimeoutError as e:
                 self.error_handler.handle_error(
-                    "openai_summarize_timeout", e,
-                    context={"content_length": len(content), "timeout": self.config.openai_timeout}
+                    "openai_summarize_timeout",
+                    e,
+                    context={
+                        "content_length": len(content),
+                        "timeout": self.config.openai_timeout,
+                    },
                 )
                 raise
             except openai.AuthenticationError as e:
@@ -354,16 +363,18 @@ for text-to-speech reading.
             except openai.APIError as e:
                 recoverable = is_recoverable_error(e)
                 self.error_handler.handle_error(
-                    "openai_summarize_api", e,
+                    "openai_summarize_api",
+                    e,
                     recoverable=recoverable,
-                    context={"content_length": len(content)}
+                    context={"content_length": len(content)},
                 )
                 raise
             except Exception as e:
                 self.error_handler.handle_error(
-                    "openai_summarize_unexpected", e,
+                    "openai_summarize_unexpected",
+                    e,
                     recoverable=is_recoverable_error(e),
-                    context={"content_length": len(content)}
+                    context={"content_length": len(content)},
                 )
                 raise
 

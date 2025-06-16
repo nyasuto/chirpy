@@ -38,7 +38,7 @@ class ChirpyConfig:
     # Content fetching settings
     fetch_timeout: int = 30  # seconds
     rate_limit_delay: int = 2  # seconds between API calls
-    
+
     # Error handling and retry settings
     max_retries: int = 3
     retry_backoff_multiplier: float = 1.0
@@ -99,10 +99,14 @@ class ChirpyConfig:
             fetch_timeout=int(os.getenv("FETCH_TIMEOUT", "30")),
             rate_limit_delay=int(os.getenv("RATE_LIMIT_DELAY", "2")),
             max_retries=int(os.getenv("MAX_RETRIES", "3")),
-            retry_backoff_multiplier=float(os.getenv("RETRY_BACKOFF_MULTIPLIER", "1.0")),
+            retry_backoff_multiplier=float(
+                os.getenv("RETRY_BACKOFF_MULTIPLIER", "1.0")
+            ),
             retry_min_wait=float(os.getenv("RETRY_MIN_WAIT", "4.0")),
             retry_max_wait=float(os.getenv("RETRY_MAX_WAIT", "10.0")),
-            circuit_breaker_failure_threshold=int(os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5")),
+            circuit_breaker_failure_threshold=int(
+                os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5")
+            ),
             circuit_breaker_timeout=int(os.getenv("CIRCUIT_BREAKER_TIMEOUT", "60")),
             request_timeout=int(os.getenv("REQUEST_TIMEOUT", "30")),
             openai_timeout=int(os.getenv("OPENAI_TIMEOUT", "60")),

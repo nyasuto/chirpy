@@ -8,7 +8,7 @@ import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any
 
 from config import get_logger
 from error_handling import ErrorHandler, is_recoverable_error
@@ -22,167 +22,170 @@ class DatabaseManager:
         self.db_path = Path(db_path)
         self.logger = get_logger(__name__)
         self.error_handler = ErrorHandler("database_manager")
-        
+
         if not self.db_path.exists():
             raise FileNotFoundError(f"Database not found: {db_path}")
 
     def get_connection(self, max_retries: int = 3) -> sqlite3.Connection:
         """
         Get database connection with retry logic for handling locks.
-        
+
         Args:
             max_retries: Maximum number of retry attempts
-            
+
         Returns:
             Database connection
-            
+
         Raises:
             sqlite3.Error: If connection fails after all retries
         """
         last_error = None
-        
+
         for attempt in range(max_retries):
             try:
                 conn = sqlite3.connect(
                     str(self.db_path),
                     timeout=30.0,  # 30 second timeout
-                    check_same_thread=False
+                    check_same_thread=False,
                 )
                 conn.row_factory = sqlite3.Row  # Enable dict-like access
-                
+
                 # Test the connection
                 conn.execute("SELECT 1")
-                
+
                 return conn
-                
+
             except sqlite3.OperationalError as e:
                 last_error = e
                 if "database is locked" in str(e).lower():
                     self.error_handler.handle_error(
-                        "database_connection_locked", e,
+                        "database_connection_locked",
+                        e,
                         retry_count=attempt,
-                        context={"database_path": str(self.db_path)}
+                        context={"database_path": str(self.db_path)},
                     )
                     if attempt < max_retries - 1:
                         # Exponential backoff for database locks
-                        wait_time = min(2 ** attempt, 5)
+                        wait_time = min(2**attempt, 5)
                         time.sleep(wait_time)
                         continue
                 else:
                     self.error_handler.handle_error(
-                        "database_connection_error", e,
+                        "database_connection_error",
+                        e,
                         recoverable=False,
-                        context={"database_path": str(self.db_path)}
+                        context={"database_path": str(self.db_path)},
                     )
                     raise
-                    
+
             except Exception as e:
                 last_error = e
                 self.error_handler.handle_error(
-                    "database_connection_unexpected", e,
+                    "database_connection_unexpected",
+                    e,
                     retry_count=attempt,
                     recoverable=is_recoverable_error(e),
-                    context={"database_path": str(self.db_path)}
+                    context={"database_path": str(self.db_path)},
                 )
                 if attempt < max_retries - 1:
                     time.sleep(1)
                 else:
                     raise
-        
+
         # If we get here, all retries failed
         if last_error:
             raise last_error
         else:
             raise sqlite3.Error("Failed to connect to database after all retries")
-    
+
     def safe_execute(
-        self, 
-        operation_name: str, 
-        query: str, 
-        params: Optional[Tuple] = None,
+        self,
+        operation_name: str,
+        query: str,
+        params: tuple | None = None,
         fetch_one: bool = False,
-        fetch_all: bool = False
-    ) -> Tuple[bool, Any]:
+        fetch_all: bool = False,
+    ) -> tuple[bool, Any]:
         """
         Safely execute a database operation with error handling.
-        
+
         Args:
             operation_name: Name of the operation for logging
             query: SQL query to execute
             params: Query parameters
             fetch_one: Whether to fetch one result
             fetch_all: Whether to fetch all results
-            
+
         Returns:
             Tuple of (success: bool, result: Any)
         """
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
+
                 if params:
                     cursor.execute(query, params)
                 else:
                     cursor.execute(query)
-                
+
                 if fetch_one:
                     result = cursor.fetchone()
                 elif fetch_all:
                     result = cursor.fetchall()
                 else:
                     result = cursor.rowcount
-                
+
                 conn.commit()
                 return True, result
-                
+
         except sqlite3.Error as e:
             self.error_handler.handle_error(
-                f"database_{operation_name}", e,
+                f"database_{operation_name}",
+                e,
                 recoverable=is_recoverable_error(e),
-                context={"query": query[:100], "params": str(params) if params else None}
+                context={
+                    "query": query[:100],
+                    "params": str(params) if params else None,
+                },
             )
             return False, None
         except Exception as e:
             self.error_handler.handle_error(
-                f"database_{operation_name}_unexpected", e,
+                f"database_{operation_name}_unexpected",
+                e,
                 recoverable=False,
-                context={"query": query[:100]}
+                context={"query": query[:100]},
             )
             return False, None
-    
+
     def check_database_health(self) -> bool:
         """
         Check database health and integrity.
-        
+
         Returns:
             True if database is healthy
         """
         try:
             # Test basic connectivity
             success, _ = self.safe_execute(
-                "health_check_connectivity",
-                "SELECT 1",
-                fetch_one=True
+                "health_check_connectivity", "SELECT 1", fetch_one=True
             )
             if not success:
                 return False
-            
+
             # Test integrity
             success, result = self.safe_execute(
-                "health_check_integrity",
-                "PRAGMA integrity_check",
-                fetch_one=True
+                "health_check_integrity", "PRAGMA integrity_check", fetch_one=True
             )
-            
+
             if success and result:
                 return result[0] == "ok"
-            
+
             return False
-            
+
         except Exception as e:
             self.error_handler.handle_error(
-                "database_health_check", e,
-                recoverable=False
+                "database_health_check", e, recoverable=False
             )
             return False
 

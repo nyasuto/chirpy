@@ -24,9 +24,9 @@ from content_fetcher import ContentFetcher
 from db_utils import DatabaseManager
 from error_handling import (
     ErrorHandler,
-    timeout_context,
-    is_recoverable_error,
     get_user_friendly_message,
+    is_recoverable_error,
+    timeout_context,
 )
 
 
@@ -38,7 +38,7 @@ class ChirpyReader:
         self.config = config
         self.logger = get_logger(__name__)
         self.db_path = Path(config.database_path)
-        
+
         # Initialize error handler
         self.error_handler = ErrorHandler("chirpy_reader")
 
@@ -88,7 +88,7 @@ class ChirpyReader:
             return None
 
     def speak_text(self, text: str) -> None:
-        """Speak the given text using available TTS method with comprehensive error handling."""
+        """Speak text using available TTS method with comprehensive error handling."""
         if not text.strip():
             return
 
@@ -110,24 +110,24 @@ class ChirpyReader:
 
         # Fallback to system TTS command
         self._try_system_tts_with_retry(text)
-    
+
     def _prepare_text_for_tts(self, text: str) -> str:
         """Prepare and validate text for TTS."""
         # Remove excessive whitespace
         text = " ".join(text.split())
-        
+
         # Truncate very long text to prevent TTS issues
         if len(text) > 10000:
             text = text[:10000] + " ... テキストが長すぎるため省略されました。"
             self.logger.warning("Text truncated for TTS due to length")
-        
+
         # Remove problematic characters that might cause TTS issues
         problematic_chars = ["<", ">", "{", "}", "[", "]", "|", "\\"]
         for char in problematic_chars:
             text = text.replace(char, " ")
-        
+
         return text.strip()
-    
+
     def _try_pyttsx3_with_timeout(self, text: str, max_retries: int = 2) -> bool:
         """Try pyttsx3 TTS with timeout and retry logic."""
         for attempt in range(max_retries):
@@ -137,82 +137,98 @@ class ChirpyReader:
                     self.tts_engine.runAndWait()
                     self.logger.debug("pyttsx3 TTS completed successfully")
                     return True
-                    
+
             except TimeoutError as e:
                 self.error_handler.handle_error(
-                    "tts_pyttsx3_timeout", e,
+                    "tts_pyttsx3_timeout",
+                    e,
                     retry_count=attempt,
-                    context={"text_length": len(text), "timeout": self.config.tts_timeout}
+                    context={
+                        "text_length": len(text),
+                        "timeout": self.config.tts_timeout,
+                    },
                 )
                 if attempt < max_retries - 1:
                     time.sleep(1)  # Brief pause before retry
-                    
+
             except Exception as e:
                 self.error_handler.handle_error(
-                    "tts_pyttsx3_error", e,
+                    "tts_pyttsx3_error",
+                    e,
                     retry_count=attempt,
                     recoverable=is_recoverable_error(e),
-                    context={"text_length": len(text)}
+                    context={"text_length": len(text)},
                 )
                 if attempt < max_retries - 1:
                     time.sleep(1)
                 else:
-                    self.logger.warning(f"pyttsx3 failed after {max_retries} attempts, using fallback")
-        
+                    self.logger.warning(
+                        f"pyttsx3 failed after {max_retries} attempts, using fallback"
+                    )
+
         return False
-    
+
     def _try_system_tts_with_retry(self, text: str, max_retries: int = 3) -> None:
         """Try system TTS command with retry logic."""
         for attempt in range(max_retries):
             try:
                 with timeout_context(self.config.tts_timeout, "system TTS"):
-                    result = subprocess.run(
-                        ["say", text], 
-                        check=True, 
-                        capture_output=True, 
+                    subprocess.run(
+                        ["say", text],
+                        check=True,
+                        capture_output=True,
                         text=True,
-                        timeout=self.config.tts_timeout
+                        timeout=self.config.tts_timeout,
                     )
                     self.logger.debug("System TTS completed successfully")
                     return
-                    
+
             except subprocess.TimeoutExpired as e:
                 self.error_handler.handle_error(
-                    "tts_system_timeout", e,
+                    "tts_system_timeout",
+                    e,
                     retry_count=attempt,
-                    context={"text_length": len(text), "timeout": self.config.tts_timeout}
+                    context={
+                        "text_length": len(text),
+                        "timeout": self.config.tts_timeout,
+                    },
                 )
-                
+
             except subprocess.CalledProcessError as e:
                 self.error_handler.handle_error(
-                    "tts_system_error", e,
+                    "tts_system_error",
+                    e,
                     retry_count=attempt,
-                    context={"text_length": len(text), "stderr": e.stderr}
+                    context={"text_length": len(text), "stderr": e.stderr},
                 )
-                
+
             except FileNotFoundError as e:
                 self.error_handler.handle_error(
-                    "tts_system_not_found", e,
+                    "tts_system_not_found",
+                    e,
                     recoverable=False,
-                    context={"command": "say"}
+                    context={"command": "say"},
                 )
-                self.logger.error("System TTS command 'say' not found. Text-to-speech unavailable.")
+                self.logger.error(
+                    "System TTS command 'say' not found. Text-to-speech unavailable."
+                )
                 return
-                
+
             except Exception as e:
                 self.error_handler.handle_error(
-                    "tts_system_unexpected", e,
+                    "tts_system_unexpected",
+                    e,
                     retry_count=attempt,
                     recoverable=is_recoverable_error(e),
-                    context={"text_length": len(text)}
+                    context={"text_length": len(text)},
                 )
-            
+
             # Wait before retry (exponential backoff)
             if attempt < max_retries - 1:
-                wait_time = min(2 ** attempt, 5)  # Cap at 5 seconds
+                wait_time = min(2**attempt, 5)  # Cap at 5 seconds
                 self.logger.debug(f"Retrying TTS in {wait_time} seconds...")
                 time.sleep(wait_time)
-        
+
         # All TTS methods failed
         friendly_message = get_user_friendly_message(
             Exception("TTS system unavailable"), "text-to-speech"
