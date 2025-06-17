@@ -155,13 +155,47 @@ clean-logs: ## Clean up log files
 	@echo "✅ Log cleanup completed!"
 
 # Git and development workflow
-git-hooks: ## Set up git pre-commit hooks
+git-hooks: ## Set up git pre-commit hooks with main branch protection
 	@echo "🎣 Setting up git hooks..."
 	@echo "#!/bin/sh" > .git/hooks/pre-commit
-	@echo "# Run quality checks before commit" >> .git/hooks/pre-commit
+	@echo "# Pre-commit hook for Chirpy project" >> .git/hooks/pre-commit
+	@echo "" >> .git/hooks/pre-commit
+	@echo "set -e" >> .git/hooks/pre-commit
+	@echo "" >> .git/hooks/pre-commit
+	@echo "# Get current branch name" >> .git/hooks/pre-commit
+	@echo 'current_branch=$$(git rev-parse --abbrev-ref HEAD)' >> .git/hooks/pre-commit
+	@echo "" >> .git/hooks/pre-commit
+	@echo "# Check if trying to commit directly to main branch" >> .git/hooks/pre-commit
+	@echo 'if [ "$$current_branch" = "main" ]; then' >> .git/hooks/pre-commit
+	@echo '    echo "🚫 ERROR: Direct commits to main branch are not allowed!"' >> .git/hooks/pre-commit
+	@echo '    echo ""' >> .git/hooks/pre-commit
+	@echo '    echo "📋 Please follow the proper workflow:"' >> .git/hooks/pre-commit
+	@echo '    echo "  1. Create a feature branch:"' >> .git/hooks/pre-commit
+	@echo '    echo "     git checkout -b {type}/issue-X-description"' >> .git/hooks/pre-commit
+	@echo '    echo ""' >> .git/hooks/pre-commit
+	@echo '    echo "  2. Make your changes and commit to the feature branch"' >> .git/hooks/pre-commit
+	@echo '    echo ""' >> .git/hooks/pre-commit
+	@echo '    echo "  3. Push and create a Pull Request:"' >> .git/hooks/pre-commit
+	@echo '    echo "     git push -u origin {type}/issue-X-description"' >> .git/hooks/pre-commit
+	@echo '    echo "     gh pr create"' >> .git/hooks/pre-commit
+	@echo '    echo ""' >> .git/hooks/pre-commit
+	@echo '    echo "💡 Example branch names:"' >> .git/hooks/pre-commit
+	@echo '    echo "  - feat/issue-49-session-management"' >> .git/hooks/pre-commit
+	@echo '    echo "  - fix/issue-50-config-inconsistency"' >> .git/hooks/pre-commit
+	@echo '    echo "  - test/issue-54-main-app-coverage"' >> .git/hooks/pre-commit
+	@echo '    echo ""' >> .git/hooks/pre-commit
+	@echo '    echo "📖 See CLAUDE.md for complete workflow guidelines"' >> .git/hooks/pre-commit
+	@echo '    echo ""' >> .git/hooks/pre-commit
+	@echo '    exit 1' >> .git/hooks/pre-commit
+	@echo 'fi' >> .git/hooks/pre-commit
+	@echo "" >> .git/hooks/pre-commit
+	@echo "# Run quality checks" >> .git/hooks/pre-commit
+	@echo 'echo "🔍 Running quality checks..."' >> .git/hooks/pre-commit
 	@echo "make quality" >> .git/hooks/pre-commit
+	@echo "" >> .git/hooks/pre-commit
+	@echo 'echo "✅ Pre-commit checks passed!"' >> .git/hooks/pre-commit
 	chmod +x .git/hooks/pre-commit
-	@echo "✅ Git hooks installed!"
+	@echo "✅ Git hooks with main branch protection installed!"
 
 # Development shortcuts
 dev: dev-setup quality run ## Quick development setup and run
