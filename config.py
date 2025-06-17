@@ -95,7 +95,7 @@ class ChirpyConfig:
             max_articles=int(os.getenv("CHIRPY_MAX_ARTICLES", "3")),
             max_summary_length=int(os.getenv("CHIRPY_MAX_SUMMARY_LENGTH", "500")),
             openai_api_key=os.getenv("OPENAI_API_KEY"),
-            openai_model=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+            openai_model=os.getenv("OPENAI_MODEL", "gpt-4o"),
             openai_max_tokens=int(os.getenv("OPENAI_MAX_TOKENS", "500")),
             openai_temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.3")),
             tts_engine=os.getenv("TTS_ENGINE", "pyttsx3"),
