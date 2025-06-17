@@ -35,6 +35,12 @@ class ChirpyConfig:
     tts_rate: int = 180  # words per minute
     tts_volume: float = 0.9  # 0.0 to 1.0
 
+    # OpenAI TTS settings
+    tts_quality: str = "hd"  # 'basic', 'standard', 'hd'
+    openai_tts_voice: str = "alloy"  # alloy, echo, fable, onyx, nova, shimmer
+    audio_format: str = "mp3"  # mp3, opus, aac, flac
+    tts_speed_multiplier: float = 1.0  # 0.25 to 4.0
+
     # Content fetching settings
     fetch_timeout: int = 30  # seconds
     rate_limit_delay: int = 2  # seconds between API calls
@@ -95,6 +101,10 @@ class ChirpyConfig:
             tts_engine=os.getenv("TTS_ENGINE", "pyttsx3"),
             tts_rate=int(os.getenv("TTS_RATE", "180")),
             tts_volume=float(os.getenv("TTS_VOLUME", "0.9")),
+            tts_quality=os.getenv("TTS_QUALITY", "hd"),
+            openai_tts_voice=os.getenv("OPENAI_TTS_VOICE", "alloy"),
+            audio_format=os.getenv("AUDIO_FORMAT", "mp3"),
+            tts_speed_multiplier=float(os.getenv("TTS_SPEED_MULTIPLIER", "1.0")),
             fetch_timeout=int(os.getenv("FETCH_TIMEOUT", "30")),
             rate_limit_delay=int(os.getenv("RATE_LIMIT_DELAY", "2")),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
