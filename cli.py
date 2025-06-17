@@ -84,6 +84,20 @@ For more information, see: https://github.com/nyasuto/chirpy
         help="Text-to-speech engine to use",
     )
 
+    # Interactive mode options
+    ui_group = parser.add_argument_group("user interface options")
+    ui_group.add_argument(
+        "--interactive",
+        "-i",
+        action="store_true",
+        help="Enable interactive mode with keyboard controls",
+    )
+    ui_group.add_argument(
+        "--select-articles",
+        action="store_true",
+        help="Show article selection menu before reading",
+    )
+
     # Content fetching options
     content_group = parser.add_argument_group("content fetching options")
     content_group.add_argument(
@@ -254,6 +268,14 @@ def apply_args_to_config(
 
     if args.no_pause:
         updates["pause_between_articles"] = False
+
+    # Interactive mode
+    if args.interactive:
+        updates["interactive_mode"] = True
+
+    # Store select_articles flag for later use
+    if hasattr(args, "select_articles"):
+        updates["select_articles"] = args.select_articles
 
     # Apply updates
     if updates:
