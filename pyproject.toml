@@ -56,4 +56,5 @@ disallow_untyped_defs = true
 dev = [
     "mypy>=1.16.0",
     "ruff>=0.11.13",
+    "types-keyboard>=0.13.2.20240310",
 ]

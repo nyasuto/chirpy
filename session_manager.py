@@ -30,7 +30,7 @@ class ReadingSession:
     words_read: int
     articles_completed: int
     session_name: str = ""
-    metadata: dict[str, Any] = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         """Initialize metadata if not provided."""

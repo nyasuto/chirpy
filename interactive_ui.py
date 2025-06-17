@@ -339,7 +339,8 @@ class ArticleSelector:
     def _is_article_read(self, article: dict[str, Any]) -> bool:
         """Check if article is marked as read."""
         # This will be enhanced when we implement proper read tracking
-        return article.get("read", False)
+        read_status = article.get("read", False)
+        return bool(read_status)
 
     def _show_filter_status(self, total: int, filtered: int) -> None:
         """Show current filter status."""
