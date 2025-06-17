@@ -16,15 +16,28 @@ from typing import Any
 
 try:
     import pyttsx3  # type: ignore
+
+    PYTTSX3_AVAILABLE = True
 except ImportError:
     pyttsx3 = None
+    PYTTSX3_AVAILABLE = False
 
 
 from cli import apply_args_to_config, handle_special_modes, parse_args
 from config import ChirpyConfig, get_logger, initialize_app_logging
 from content_fetcher import ContentFetcher
 from database_service import DatabaseManager
-from interactive_ui import ArticleSelector, InteractiveController, ProgressTracker
+
+try:
+    from interactive_ui import ArticleSelector, InteractiveController, ProgressTracker
+except Exception as e:
+    # Fallback to safe version if interactive_ui has issues
+    print(f"Warning: Using safe interactive UI due to: {e}")
+    from interactive_ui_safe import (
+        ArticleSelector,
+        InteractiveController,
+        ProgressTracker,
+    )
 
 
 class ChirpyReader:
@@ -65,7 +78,7 @@ class ChirpyReader:
             self.logger.info("Text-to-speech disabled by configuration")
             return None
 
-        if pyttsx3 is None:
+        if not PYTTSX3_AVAILABLE:
             self.logger.warning(
                 "pyttsx3 not available, using macOS 'say' command fallback"
             )

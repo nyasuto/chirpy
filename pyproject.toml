@@ -16,7 +16,6 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "langdetect>=1.0.9",
     "rich>=14.0.0",
-    "keyboard>=0.13.5",
     "sqlmodel>=0.0.24",
 ]
 
@@ -58,10 +57,15 @@ plugins = ["sqlalchemy.ext.mypy.plugin"]
 [[tool.mypy.overrides]]
 module = ["db_models", "database_service"]
 disable_error_code = ["attr-defined", "union-attr", "arg-type"]
+# Ignore interactive UI fallback import issues
+[[tool.mypy.overrides]]
+module = ["interactive_ui", "interactive_ui_safe", "chirpy"]
+disable_error_code = ["assignment"]
 
 [dependency-groups]
 dev = [
     "mypy>=1.16.0",
     "ruff>=0.11.13",
     "types-keyboard>=0.13.2.20240310",
+    "types-requests>=2.32.4.20250611",
 ]
