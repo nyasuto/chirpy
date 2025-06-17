@@ -162,7 +162,7 @@ class SessionQueries:
         """Get incomplete reading sessions."""
         return (
             select(ReadingSession)
-            .where(not ReadingSession.completed)
+            .where(ReadingSession.completed.is_(False))
             .order_by(ReadingSession.updated_at.desc())
             .limit(limit)
         )
