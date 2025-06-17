@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🛠️ Development Tools
+
+**Use the Makefile for all development tasks!** This project includes a comprehensive Makefile that standardizes development workflows.
+
+- **Quick start:** `make help` to see all available commands
+- **Code quality:** `make quality` (replaces individual ruff/mypy commands)
+- **Development:** `make dev` for quick setup and run
+- **PR preparation:** `make pr-ready` to ensure code is ready for submission
+
 ## 🔨 最重要ルール - 新しいルールの追加プロセス
 
 ユーザーから今回限りではなく常に対応が必要だと思われる指示を受けた場合：
@@ -77,17 +86,41 @@ Key points:
 
 ## Common Commands
 
-### Code Quality
-- Lint code: `uv run ruff check .`
-- Format code: `uv run ruff format .`
-- Type check: `uv run mypy .`
+### Code Quality (Using Makefile)
+- **Run all quality checks:** `make quality` (lint + format + type-check)
+- **Auto-fix issues:** `make quality-fix`
+- **Individual checks:**
+  - Lint code: `make lint`
+  - Format code: `make format`
+  - Type check: `make type-check`
+
+### Application Commands
+- **Run Chirpy:** `make run`
+- **Interactive mode:** `make run-interactive`
+- **Debug mode:** `make run-debug`
+- **Show help:** `make run-help`
+- **Process summaries:** `make run-process`
+- **Show stats:** `make run-stats`
 
 ### Database Operations
-- Check article count: `sqlite3 data/articles.db "SELECT COUNT(*) FROM articles"`
-- View schema: `sqlite3 data/articles.db ".schema articles"`
-- Sync database: `./collect.sh`
+- **Article statistics:** `make db-stats`
+- **Database schema:** `make db-schema`
+- **Sync database:** `make db-sync`
 
 ### Development Setup
+- **Full setup:** `make dev-setup`
+- **Install dependencies:** `make install`
+- **Build package:** `make build`
+- **Clean artifacts:** `make clean`
+- **Show environment:** `make env-info`
+
+### Development Workflow
+- **Quick dev cycle:** `make dev` (setup + quality + run)
+- **PR preparation:** `make pr-ready`
+- **Setup git hooks:** `make git-hooks`
+- **All commands:** `make help`
+
+### Legacy Commands (if Makefile unavailable)
 - Install dependencies: `uv sync`
 - Run application: `uv run python chirpy.py`
 - Add new dependency: `uv add <package>`
@@ -133,14 +166,18 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 1. Create branch from main
 2. Make changes
 3. **Run Code Quality checks before commit:**
-   - `uv run ruff check .` (linting)
-   - `uv run ruff format .` (formatting)
-   - `uv run mypy .` (type checking)
+   - `make quality` (runs all: lint + format + type-check)
+   - OR `make quality-fix` (auto-fix + check)
+   - OR individual commands: `make lint`, `make format`, `make type-check`
 4. Commit only after all checks pass
 5. Push branch to remote
 6. Create Pull Request
 7. Wait for CI checks to pass
 8. Merge via GitHub (not locally)
+
+### Pre-commit Setup (Recommended)
+- Run `make git-hooks` to automatically run quality checks before each commit
+- This prevents committing code that doesn't pass quality standards
 
 ## Implementation Notes
 
