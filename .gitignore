@@ -13,6 +13,16 @@ __pycache__/
 venv/
 .venv/
 
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.xml
+*.cover
+*.py,cover
+.coverage.*
+
 # uv
 uv.lock
 
