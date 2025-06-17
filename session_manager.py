@@ -85,7 +85,7 @@ class SessionManager:
                         reading_time REAL DEFAULT 0.0,
                         words_count INTEGER DEFAULT 0,
                         skipped BOOLEAN DEFAULT 0,
-                        FOREIGN KEY (session_id) 
+                        FOREIGN KEY (session_id)
                             REFERENCES reading_sessions(session_id),
                         FOREIGN KEY (article_id) REFERENCES articles(id)
                     )
@@ -126,9 +126,9 @@ class SessionManager:
             total_reading_time=0.0,
             words_read=0,
             articles_completed=0,
-            session_name=(
-                session_name or
-                f"Session {datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M')}"
+            session_name=session_name or (
+                "Session " +
+                datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M')
             )
         )
 
@@ -214,7 +214,9 @@ class SessionManager:
             self.logger.error(f"Failed to load session {session_id}: {e}")
             return None
 
-    def list_sessions(self, limit: int = 10, include_completed: bool = True) -> list[dict[str, Any]]:
+    def list_sessions(
+        self, limit: int = 10, include_completed: bool = True
+    ) -> list[dict[str, Any]]:
         """List recent reading sessions."""
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
@@ -223,12 +225,12 @@ class SessionManager:
                 where_clause = "" if include_completed else "WHERE completed = 0"
 
                 cursor.execute(f"""
-                    SELECT session_id, created_at, updated_at, session_name, 
+                    SELECT session_id, created_at, updated_at, session_name,
                            completed, articles_completed, total_reading_time,
                            json_array_length(article_ids) as total_articles
-                    FROM reading_sessions 
+                    FROM reading_sessions
                     {where_clause}
-                    ORDER BY updated_at DESC 
+                    ORDER BY updated_at DESC
                     LIMIT ?
                 """, (limit,))
 
@@ -274,7 +276,9 @@ class SessionManager:
         # Record article reading history
         if self.current_session.current_index < len(self.current_session.article_ids):
             article_id = self.current_session.article_ids[article_index]
-            self._record_article_reading(article_id, reading_time, words_count, completed)
+            self._record_article_reading(
+                article_id, reading_time, words_count, completed
+            )
 
     def _record_article_reading(self, article_id: int, reading_time: float,
                               words_count: int, completed: bool) -> None:
@@ -289,8 +293,8 @@ class SessionManager:
                 current_time = time.time()
 
                 cursor.execute("""
-                    INSERT OR REPLACE INTO reading_history 
-                    (session_id, article_id, started_at, completed_at, 
+                    INSERT OR REPLACE INTO reading_history
+                    (session_id, article_id, started_at, completed_at,
                      reading_time, words_count, skipped)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
