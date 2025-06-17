@@ -31,7 +31,7 @@ def sample_config(test_db_path):
         max_articles=3,
         max_summary_length=500,
         openai_api_key="test-key",
-        openai_model="gpt-3.5-turbo",
+        openai_model="gpt-4o",
         tts_rate=180,
         tts_volume=0.9,
         log_level="INFO",
