@@ -274,7 +274,7 @@ def apply_args_to_config(
         updates["interactive_mode"] = True
 
     # Store select_articles flag for later use
-    if hasattr(args, 'select_articles'):
+    if hasattr(args, "select_articles"):
         updates["select_articles"] = args.select_articles
 
     # Apply updates

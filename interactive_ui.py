@@ -65,16 +65,16 @@ class InteractiveController:
     def _setup_keyboard_hooks(self) -> None:
         """Set up keyboard event handlers."""
         try:
-            keyboard.on_press_key('space', self._handle_space_key)
-            keyboard.on_press_key('right', self._handle_right_arrow)
-            keyboard.on_press_key('left', self._handle_left_arrow)
-            keyboard.on_press_key('up', self._handle_up_arrow)
-            keyboard.on_press_key('down', self._handle_down_arrow)
-            keyboard.on_press_key('=', self._handle_speed_up)
-            keyboard.on_press_key('-', self._handle_speed_down)
-            keyboard.on_press_key('q', self._handle_quit)
-            keyboard.on_press_key('h', self._handle_help)
-            keyboard.on_press_key('s', self._handle_save_session)
+            keyboard.on_press_key("space", self._handle_space_key)
+            keyboard.on_press_key("right", self._handle_right_arrow)
+            keyboard.on_press_key("left", self._handle_left_arrow)
+            keyboard.on_press_key("up", self._handle_up_arrow)
+            keyboard.on_press_key("down", self._handle_down_arrow)
+            keyboard.on_press_key("=", self._handle_speed_up)
+            keyboard.on_press_key("-", self._handle_speed_down)
+            keyboard.on_press_key("q", self._handle_quit)
+            keyboard.on_press_key("h", self._handle_help)
+            keyboard.on_press_key("s", self._handle_save_session)
 
             self.logger.info("Interactive keyboard controls enabled")
         except Exception as e:
@@ -258,7 +258,7 @@ class InteractiveController:
                 PlaybackState.PLAYING: "green",
                 PlaybackState.PAUSED: "yellow",
                 PlaybackState.STOPPED: "red",
-                PlaybackState.SKIPPING: "blue"
+                PlaybackState.SKIPPING: "blue",
             }.get(self.state, "white")
 
             status_text = f"[{status_color}]{self.state.value.upper()}[/{status_color}]"
@@ -315,11 +315,12 @@ class ArticleSelector:
 
         # For now, return unread articles (interactive selection coming later)
         selected_indices = [
-            i for i, article in enumerate(filtered_articles)
+            i
+            for i, article in enumerate(filtered_articles)
             if not self._is_article_read(article)
         ]
 
-        return selected_indices[:self.config.max_articles]
+        return selected_indices[: self.config.max_articles]
 
     def _apply_filters(self, articles: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Apply filters to article list."""
@@ -327,15 +328,11 @@ class ArticleSelector:
 
         # Filter by read status (default: unread only)
         filtered = [
-            article for article in filtered
-            if not self._is_article_read(article)
+            article for article in filtered if not self._is_article_read(article)
         ]
 
         # Sort by published date (newest first)
-        filtered.sort(
-            key=lambda x: x.get("published", ""),
-            reverse=True
-        )
+        filtered.sort(key=lambda x: x.get("published", ""), reverse=True)
 
         return filtered
 
@@ -411,7 +408,7 @@ class ArticleSelector:
             "[bold]Selection Mode:[/bold] Automatically selecting unread articles\n"
             "[dim]Future: Interactive selection with number input and search[/dim]",
             title="📝 Instructions",
-            border_style="blue"
+            border_style="blue",
         )
         self.console.print(instructions)
 
@@ -434,8 +431,9 @@ class ArticleSelector:
 
         return filtered
 
-    def filter_by_date_range(self, articles: list[dict[str, Any]],
-                           days_back: int = 7) -> list[dict[str, Any]]:
+    def filter_by_date_range(
+        self, articles: list[dict[str, Any]], days_back: int = 7
+    ) -> list[dict[str, Any]]:
         """Filter articles by date range."""
         from datetime import datetime, timedelta
 

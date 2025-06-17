@@ -126,10 +126,11 @@ class SessionManager:
             total_reading_time=0.0,
             words_read=0,
             articles_completed=0,
-            session_name=session_name or (
-                "Session " +
-                datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M')
-            )
+            session_name=session_name
+            or (
+                "Session "
+                + datetime.fromtimestamp(current_time).strftime("%Y-%m-%d %H:%M")
+            ),
         )
 
         self.current_session = session
@@ -147,25 +148,28 @@ class SessionManager:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT OR REPLACE INTO reading_sessions
                     (session_id, created_at, updated_at, article_ids, current_index,
                      completed, total_reading_time, words_read, articles_completed,
                      session_name, metadata)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    session.session_id,
-                    session.created_at,
-                    session.updated_at,
-                    json.dumps(session.article_ids),
-                    session.current_index,
-                    session.completed,
-                    session.total_reading_time,
-                    session.words_read,
-                    session.articles_completed,
-                    session.session_name,
-                    json.dumps(session.metadata)
-                ))
+                """,
+                    (
+                        session.session_id,
+                        session.created_at,
+                        session.updated_at,
+                        json.dumps(session.article_ids),
+                        session.current_index,
+                        session.completed,
+                        session.total_reading_time,
+                        session.words_read,
+                        session.articles_completed,
+                        session.session_name,
+                        json.dumps(session.metadata),
+                    ),
+                )
 
                 conn.commit()
                 return True
@@ -180,13 +184,16 @@ class SessionManager:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT session_id, created_at, updated_at, article_ids,
                            current_index, completed, total_reading_time, words_read,
                            articles_completed, session_name, metadata
                     FROM reading_sessions
                     WHERE session_id = ?
-                """, (session_id,))
+                """,
+                    (session_id,),
+                )
 
                 row = cursor.fetchone()
                 if not row:
@@ -203,7 +210,7 @@ class SessionManager:
                     words_read=row[7],
                     articles_completed=row[8],
                     session_name=row[9],
-                    metadata=json.loads(row[10])
+                    metadata=json.loads(row[10]),
                 )
 
                 self.current_session = session
@@ -224,7 +231,8 @@ class SessionManager:
 
                 where_clause = "" if include_completed else "WHERE completed = 0"
 
-                cursor.execute(f"""
+                cursor.execute(
+                    f"""
                     SELECT session_id, created_at, updated_at, session_name,
                            completed, articles_completed, total_reading_time,
                            json_array_length(article_ids) as total_articles
@@ -232,20 +240,24 @@ class SessionManager:
                     {where_clause}
                     ORDER BY updated_at DESC
                     LIMIT ?
-                """, (limit,))
+                """,
+                    (limit,),
+                )
 
                 sessions = []
                 for row in cursor.fetchall():
-                    sessions.append({
-                        "session_id": row[0],
-                        "created_at": row[1],
-                        "updated_at": row[2],
-                        "session_name": row[3],
-                        "completed": bool(row[4]),
-                        "articles_completed": row[5],
-                        "total_reading_time": row[6],
-                        "total_articles": row[7]
-                    })
+                    sessions.append(
+                        {
+                            "session_id": row[0],
+                            "created_at": row[1],
+                            "updated_at": row[2],
+                            "session_name": row[3],
+                            "completed": bool(row[4]),
+                            "articles_completed": row[5],
+                            "total_reading_time": row[6],
+                            "total_articles": row[7],
+                        }
+                    )
 
                 return sessions
 
@@ -253,8 +265,13 @@ class SessionManager:
             self.logger.error(f"Failed to list sessions: {e}")
             return []
 
-    def update_session_progress(self, article_index: int, reading_time: float,
-                              words_count: int, completed: bool = False) -> None:
+    def update_session_progress(
+        self,
+        article_index: int,
+        reading_time: float,
+        words_count: int,
+        completed: bool = False,
+    ) -> None:
         """Update current session progress."""
         if not self.current_session:
             return
@@ -280,8 +297,9 @@ class SessionManager:
                 article_id, reading_time, words_count, completed
             )
 
-    def _record_article_reading(self, article_id: int, reading_time: float,
-                              words_count: int, completed: bool) -> None:
+    def _record_article_reading(
+        self, article_id: int, reading_time: float, words_count: int, completed: bool
+    ) -> None:
         """Record individual article reading in history."""
         if not self.current_session:
             return
@@ -292,20 +310,23 @@ class SessionManager:
 
                 current_time = time.time()
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT OR REPLACE INTO reading_history
                     (session_id, article_id, started_at, completed_at,
                      reading_time, words_count, skipped)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    self.current_session.session_id,
-                    article_id,
-                    current_time - reading_time,
-                    current_time if completed else None,
-                    reading_time,
-                    words_count,
-                    not completed
-                ))
+                """,
+                    (
+                        self.current_session.session_id,
+                        article_id,
+                        current_time - reading_time,
+                        current_time if completed else None,
+                        reading_time,
+                        words_count,
+                        not completed,
+                    ),
+                )
 
                 conn.commit()
 
@@ -321,12 +342,15 @@ class SessionManager:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT sessions_count, articles_read, total_reading_time,
                            words_read, average_wpm
                     FROM reading_stats
                     WHERE date = ?
-                """, (date,))
+                """,
+                    (date,),
+                )
 
                 row = cursor.fetchone()
                 if row:
@@ -336,7 +360,7 @@ class SessionManager:
                         "articles_read": row[1],
                         "total_reading_time": row[2],
                         "words_read": row[3],
-                        "average_wpm": row[4]
+                        "average_wpm": row[4],
                     }
                 else:
                     return {
@@ -345,7 +369,7 @@ class SessionManager:
                         "articles_read": 0,
                         "total_reading_time": 0.0,
                         "words_read": 0,
-                        "average_wpm": 0.0
+                        "average_wpm": 0.0,
                     }
 
         except sqlite3.Error as e:
@@ -356,7 +380,7 @@ class SessionManager:
                 "articles_read": 0,
                 "total_reading_time": 0.0,
                 "words_read": 0,
-                "average_wpm": 0.0
+                "average_wpm": 0.0,
             }
 
     def update_daily_stats(self) -> None:
@@ -371,7 +395,8 @@ class SessionManager:
                 cursor = conn.cursor()
 
                 # Calculate stats for today
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT
                         COUNT(DISTINCT session_id) as sessions_count,
                         COUNT(*) as articles_read,
@@ -380,7 +405,9 @@ class SessionManager:
                     FROM reading_history
                     WHERE date(started_at, 'unixepoch') = ?
                     AND completed_at IS NOT NULL
-                """, (today,))
+                """,
+                    (today,),
+                )
 
                 row = cursor.fetchone()
                 if row:
@@ -389,15 +416,22 @@ class SessionManager:
                     # Calculate average WPM
                     avg_wpm = (words_read / (total_time / 60)) if total_time > 0 else 0
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT OR REPLACE INTO reading_stats
                         (date, sessions_count, articles_read, total_reading_time,
                          words_read, average_wpm)
                         VALUES (?, ?, ?, ?, ?, ?)
-                    """, (
-                        today, sessions_count, articles_read,
-                        total_time, words_read, avg_wpm
-                    ))
+                    """,
+                        (
+                            today,
+                            sessions_count,
+                            articles_read,
+                            total_time,
+                            words_read,
+                            avg_wpm,
+                        ),
+                    )
 
                     conn.commit()
 
@@ -412,21 +446,19 @@ class SessionManager:
 
                 # Delete history first (foreign key constraint)
                 cursor.execute(
-                    "DELETE FROM reading_history WHERE session_id = ?",
-                    (session_id,)
+                    "DELETE FROM reading_history WHERE session_id = ?", (session_id,)
                 )
 
                 # Delete session
                 cursor.execute(
-                    "DELETE FROM reading_sessions WHERE session_id = ?",
-                    (session_id,)
+                    "DELETE FROM reading_sessions WHERE session_id = ?", (session_id,)
                 )
 
                 conn.commit()
 
                 if (
-                    self.current_session and
-                    self.current_session.session_id == session_id
+                    self.current_session
+                    and self.current_session.session_id == session_id
                 ):
                     self.current_session = None
 
@@ -448,24 +480,29 @@ class SessionManager:
                 cursor = conn.cursor()
 
                 # Get reading history for this session
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT article_id, started_at, completed_at, reading_time,
                            words_count, skipped
                     FROM reading_history
                     WHERE session_id = ?
                     ORDER BY started_at
-                """, (session_id,))
+                """,
+                    (session_id,),
+                )
 
                 history = []
                 for row in cursor.fetchall():
-                    history.append({
-                        "article_id": row[0],
-                        "started_at": row[1],
-                        "completed_at": row[2],
-                        "reading_time": row[3],
-                        "words_count": row[4],
-                        "skipped": bool(row[5])
-                    })
+                    history.append(
+                        {
+                            "article_id": row[0],
+                            "started_at": row[1],
+                            "completed_at": row[2],
+                            "reading_time": row[3],
+                            "words_count": row[4],
+                            "skipped": bool(row[5]),
+                        }
+                    )
 
                 return {
                     "session": {
@@ -479,13 +516,12 @@ class SessionManager:
                         "words_read": session.words_read,
                         "articles_completed": session.articles_completed,
                         "session_name": session.session_name,
-                        "metadata": session.metadata
+                        "metadata": session.metadata,
                     },
                     "history": history,
-                    "exported_at": time.time()
+                    "exported_at": time.time(),
                 }
 
         except sqlite3.Error as e:
             self.logger.error(f"Failed to export session data: {e}")
             return None
-

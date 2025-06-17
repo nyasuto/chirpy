@@ -153,7 +153,7 @@ class ChirpyReader:
                     ["say"] + rate_arg + [sentence],
                     check=True,
                     capture_output=True,
-                    timeout=30
+                    timeout=30,
                 )
             except (
                 subprocess.CalledProcessError,
@@ -167,7 +167,8 @@ class ChirpyReader:
         """Split text into manageable chunks for interactive playback."""
         # Split by sentences, but keep reasonable chunk sizes
         import re
-        sentences = re.split(r'[.!?]+', text)
+
+        sentences = re.split(r"[.!?]+", text)
         chunks = []
         current_chunk = ""
 
@@ -200,7 +201,7 @@ class ChirpyReader:
                 skip=self._skip_current,
                 speed=self._adjust_speed,
                 volume=self._adjust_volume,
-                stop=self._stop_playback
+                stop=self._stop_playback,
             )
 
     def _pause_playback(self) -> None:
@@ -438,7 +439,7 @@ class ChirpyReader:
                 selected_indices = self.article_selector.show_article_menu(all_articles)
                 articles = [all_articles[i] for i in selected_indices]
             else:
-                articles = all_articles[:self.config.max_articles]
+                articles = all_articles[: self.config.max_articles]
 
             if not articles:
                 self.logger.info("No articles selected for reading")
@@ -455,8 +456,7 @@ class ChirpyReader:
 
             # Introduction
             intro_text = (
-                f"Welcome to Chirpy! I found {len(articles)} articles "
-                "to read for you."
+                f"Welcome to Chirpy! I found {len(articles)} articles to read for you."
             )
             if self.interactive_controller:
                 intro_text += " Press H for keyboard shortcuts."
@@ -478,7 +478,7 @@ class ChirpyReader:
 
                 # Update progress tracking and UI
                 if self.interactive_controller:
-                    self.interactive_controller.update_progress(i, article['title'])
+                    self.interactive_controller.update_progress(i, article["title"])
 
                 self.progress_tracker.update_statistics(article)
 
