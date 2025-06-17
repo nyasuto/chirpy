@@ -23,7 +23,7 @@ except ImportError:
 from cli import apply_args_to_config, handle_special_modes, parse_args
 from config import ChirpyConfig, get_logger, initialize_app_logging
 from content_fetcher import ContentFetcher
-from db_utils import DatabaseManager
+from database_service import DatabaseManager
 from interactive_ui import ArticleSelector, InteractiveController, ProgressTracker
 
 
