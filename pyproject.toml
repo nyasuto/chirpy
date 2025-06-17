@@ -17,6 +17,7 @@ dependencies = [
     "langdetect>=1.0.9",
     "rich>=14.0.0",
     "keyboard>=0.13.5",
+    "sqlmodel>=0.0.24",
 ]
 
 [build-system]
@@ -51,6 +52,12 @@ python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+# SQLAlchemy/SQLModel specific configurations
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+# Ignore complex SQLAlchemy column attribute issues in POC files
+[[tool.mypy.overrides]]
+module = ["db_models", "database_service"]
+disable_error_code = ["attr-defined", "union-attr", "arg-type"]
 
 [dependency-groups]
 dev = [

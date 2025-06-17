@@ -339,7 +339,7 @@ def handle_special_modes(args: argparse.Namespace, config: ChirpyConfig) -> bool
         return True
 
     if args.stats:
-        from db_utils import DatabaseManager
+        from database_service import DatabaseManager
 
         db = DatabaseManager(config.database_path)
         stats = db.get_database_stats()
@@ -367,7 +367,7 @@ def handle_special_modes(args: argparse.Namespace, config: ChirpyConfig) -> bool
 
     if args.translate_articles:
         from content_fetcher import ContentFetcher
-        from db_utils import DatabaseManager
+        from database_service import DatabaseManager
 
         print("🔄 Processing articles for translation...")
 
