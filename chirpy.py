@@ -7,7 +7,6 @@ Reads articles from SQLite database and provides audio narration.
 """
 
 import logging
-import subprocess
 import sys
 import threading
 import time
@@ -27,6 +26,7 @@ from cli import apply_args_to_config, handle_special_modes, parse_args
 from config import ChirpyConfig, get_logger, initialize_app_logging
 from content_fetcher import ContentFetcher
 from database_service import DatabaseManager
+from tts_service import EnhancedTTSService, TTSQuality
 
 try:
     from interactive_ui import ArticleSelector, InteractiveController, ProgressTracker
@@ -55,7 +55,7 @@ class ChirpyReader:
             sys.exit(1)
 
         self.db = DatabaseManager(str(self.db_path))
-        self.tts_engine = self._initialize_tts()
+        self.tts_service = EnhancedTTSService(config)
         self.content_fetcher = ContentFetcher(config)
 
         # Interactive UI components
@@ -72,44 +72,26 @@ class ChirpyReader:
         self.current_speed_multiplier = 1.0
         self.playback_lock = threading.Lock()
 
-    def _initialize_tts(self) -> pyttsx3.Engine | None:
-        """Initialize text-to-speech engine."""
-        if not self.config.speech_enabled:
-            self.logger.info("Text-to-speech disabled by configuration")
-            return None
+    def _log_tts_info(self) -> None:
+        """Log TTS service information."""
+        available_qualities = self.tts_service.get_available_qualities()
+        self.logger.info(
+            f"TTS service initialized with {len(available_qualities)} quality levels"
+        )
+        self.logger.info(f"Available: {[q.value for q in available_qualities]}")
 
-        if not PYTTSX3_AVAILABLE:
-            self.logger.warning(
-                "pyttsx3 not available, using macOS 'say' command fallback"
-            )
-            return None
-
-        try:
-            engine = pyttsx3.init()
-
-            # Configure TTS settings from config
-            voices = engine.getProperty("voices")
-            if voices:
-                # Use first available voice
-                engine.setProperty("voice", voices[0].id)
-
-            # Set speech rate from config
-            engine.setProperty("rate", self.config.tts_rate)
-            engine.setProperty("volume", self.config.tts_volume)
-
+        if (
+            TTSQuality.HD in available_qualities
+            or TTSQuality.STANDARD in available_qualities
+        ):
+            self.logger.info("✨ High-quality OpenAI TTS available!")
+        else:
             self.logger.info(
-                f"TTS initialized with rate={self.config.tts_rate}, "
-                f"volume={self.config.tts_volume}"
+                "Using system TTS (consider adding OPENAI_API_KEY for better quality)"
             )
-            return engine
-
-        except Exception as e:
-            self.logger.warning(f"Failed to initialize pyttsx3: {e}")
-            self.logger.info("Using macOS 'say' command fallback")
-            return None
 
     def speak_text(self, text: str) -> None:
-        """Speak text using available TTS method with interactive controls."""
+        """Speak text using enhanced TTS service with interactive controls."""
         if not text.strip():
             return
 
@@ -124,15 +106,12 @@ class ChirpyReader:
 
         self.logger.info(f"Speaking: {text[:100]}{'...' if len(text) > 100 else ''}")
 
-        # Split text into sentences for pause/resume support
-        sentences = self._split_text_for_playback(text)
-
-        for sentence in sentences:
+        # For OpenAI TTS, speak the entire text at once for better quality
+        # For system TTS, split into sentences for pause/resume support
+        if self.tts_service.current_quality in [TTSQuality.STANDARD, TTSQuality.HD]:
+            # High-quality TTS - speak entire text
             with self.playback_lock:
-                if self.should_stop:
-                    return
-                if self.should_skip:
-                    self.should_skip = False  # Reset skip flag
+                if self.should_stop or self.should_skip:
                     return
 
                 # Wait while paused
@@ -142,39 +121,41 @@ class ChirpyReader:
                 if self.should_stop:
                     return
 
-            # Apply speed adjustment
-            adjusted_rate = int(self.config.tts_rate * self.current_speed_multiplier)
-
-            # Try TTS engine first
-            if self.tts_engine:
-                try:
-                    # Update rate for current sentence
-                    self.tts_engine.setProperty("rate", adjusted_rate)
-                    self.tts_engine.setProperty("volume", self.config.tts_volume)
-                    self.tts_engine.say(sentence)
-                    self.tts_engine.runAndWait()
-                    continue
-                except Exception as e:
-                    self.logger.warning(
-                        f"TTS engine error: {e}, falling back to 'say' command"
-                    )
-
-            # Fallback to system 'say' command
             try:
-                rate_arg = ["-r", str(adjusted_rate)] if adjusted_rate != 180 else []
-                subprocess.run(
-                    ["say"] + rate_arg + [sentence],
-                    check=True,
-                    capture_output=True,
-                    timeout=30,
+                success = self.tts_service.speak_text(
+                    text, self.config.openai_tts_voice
                 )
-            except (
-                subprocess.CalledProcessError,
-                FileNotFoundError,
-                subprocess.TimeoutExpired,
-            ) as e:
-                self.logger.error(f"Text-to-speech not available: {e}")
-                break
+                if not success:
+                    self.logger.warning("High-quality TTS failed, using fallback")
+            except Exception as e:
+                self.logger.error(f"TTS service error: {e}")
+        else:
+            # System TTS - split into sentences for interactive control
+            sentences = self._split_text_for_playback(text)
+
+            for sentence in sentences:
+                with self.playback_lock:
+                    if self.should_stop:
+                        return
+                    if self.should_skip:
+                        self.should_skip = False  # Reset skip flag
+                        return
+
+                    # Wait while paused
+                    while self.is_paused and not self.should_stop:
+                        time.sleep(0.1)
+
+                    if self.should_stop:
+                        return
+
+                try:
+                    success = self.tts_service.speak_text(sentence)
+                    if not success:
+                        self.logger.error("TTS failed for sentence")
+                        break
+                except Exception as e:
+                    self.logger.error(f"TTS error: {e}")
+                    break
 
     def _split_text_for_playback(self, text: str) -> list[str]:
         """Split text into manageable chunks for interactive playback."""
@@ -241,11 +222,7 @@ class ChirpyReader:
     def _adjust_volume(self, volume: float) -> None:
         """Adjust playback volume."""
         self.config.tts_volume = volume
-        if self.tts_engine:
-            try:
-                self.tts_engine.setProperty("volume", volume)
-            except Exception as e:
-                self.logger.debug(f"Failed to adjust TTS volume: {e}")
+        # Volume adjustment for TTS service will be handled in the next audio clip
 
     def _stop_playback(self) -> None:
         """Stop playback completely."""
@@ -422,6 +399,9 @@ class ChirpyReader:
         self.logger.info("Chirpy RSS Reader Starting...")
 
         try:
+            # Log TTS service information
+            self._log_tts_info()
+
             # Setup interactive controls if enabled
             if self.interactive_controller:
                 self._setup_interactive_controls()
