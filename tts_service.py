@@ -219,7 +219,7 @@ class SystemTTSProvider:
 
         # Try to import pyttsx3
         try:
-            import pyttsx3
+            import pyttsx3  # type: ignore
 
             self.engine = pyttsx3.init()
             self.engine.setProperty("rate", config.tts_rate)
