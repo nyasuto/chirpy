@@ -17,7 +17,7 @@ class TestChirpyConfig:
     def test_default_config_creation(self):
         """Test creating config with default values."""
         config = ChirpyConfig()
-        
+
         assert config.database_path == "data/articles.db"
         assert config.max_articles == 3
         assert config.max_summary_length == 500
@@ -41,7 +41,7 @@ class TestChirpyConfig:
             auto_mark_read=False,
             speech_enabled=False,
         )
-        
+
         assert config.database_path == "/custom/path/db.sqlite"
         assert config.max_articles == 5
         assert config.max_summary_length == 1000
@@ -55,14 +55,14 @@ class TestChirpyConfig:
         """Test that config values are validated within proper ranges."""
         config = ChirpyConfig(
             max_articles=0,  # Below minimum
-            tts_rate=10,     # Below minimum
-            tts_volume=-0.5, # Below minimum
+            tts_rate=10,  # Below minimum
+            tts_volume=-0.5,  # Below minimum
             openai_temperature=3.0,  # Above maximum
         )
-        
+
         # Should be clamped to valid ranges
         assert config.max_articles == 1  # Minimum 1
-        assert config.tts_rate == 50     # Minimum 50
+        assert config.tts_rate == 50  # Minimum 50
         assert config.tts_volume == 0.0  # Minimum 0.0
         assert config.openai_temperature == 2.0  # Maximum 2.0
 
@@ -71,21 +71,21 @@ class TestChirpyConfig:
         """Test config validation for upper bounds."""
         config = ChirpyConfig(
             max_articles=150,  # Above maximum
-            tts_rate=600,      # Above maximum
-            tts_volume=1.5,    # Above maximum
+            tts_rate=600,  # Above maximum
+            tts_volume=1.5,  # Above maximum
         )
-        
+
         # Should be clamped to valid ranges
         assert config.max_articles == 100  # Maximum 100
-        assert config.tts_rate == 500      # Maximum 500
-        assert config.tts_volume == 1.0    # Maximum 1.0
+        assert config.tts_rate == 500  # Maximum 500
+        assert config.tts_volume == 1.0  # Maximum 1.0
 
     @pytest.mark.unit
     def test_path_expansion(self):
         """Test that database path is properly expanded."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ChirpyConfig(database_path=f"{tmpdir}/test.db")
-            
+
             # Path should be absolute
             assert Path(config.database_path).is_absolute()
             assert config.database_path.endswith("test.db")
@@ -94,16 +94,16 @@ class TestChirpyConfig:
     def test_update_from_dict(self):
         """Test updating config from dictionary."""
         config = ChirpyConfig()
-        
+
         updates = {
             "max_articles": 7,
             "tts_rate": 220,
             "speech_enabled": False,
             "log_level": "DEBUG",
         }
-        
+
         config.update_from_dict(updates)
-        
+
         assert config.max_articles == 7
         assert config.tts_rate == 220
         assert config.speech_enabled is False
@@ -115,14 +115,14 @@ class TestChirpyConfig:
     def test_update_from_dict_with_validation(self):
         """Test that update_from_dict still applies validation."""
         config = ChirpyConfig()
-        
+
         updates = {
             "max_articles": 200,  # Above maximum
-            "tts_volume": 2.0,    # Above maximum
+            "tts_volume": 2.0,  # Above maximum
         }
-        
+
         config.update_from_dict(updates)
-        
+
         # Should be clamped to valid ranges
         assert config.max_articles == 100
         assert config.tts_volume == 1.0
@@ -131,15 +131,14 @@ class TestChirpyConfig:
     def test_update_from_dict_ignores_invalid_keys(self):
         """Test that update_from_dict ignores keys that don't exist."""
         config = ChirpyConfig()
-        original_max_articles = config.max_articles
-        
+
         updates = {
             "invalid_key": "should_be_ignored",
             "max_articles": 5,
         }
-        
+
         config.update_from_dict(updates)
-        
+
         assert config.max_articles == 5
         # Invalid key should not cause errors or create new attributes
         assert not hasattr(config, "invalid_key")
@@ -150,7 +149,7 @@ class TestChirpyConfig:
         # Clean environment is handled by conftest.py fixture
         # Note: load_dotenv() may still load from .env file if present
         config = ChirpyConfig.from_env()
-        
+
         # Should use default values or .env file values
         assert config.database_path == "data/articles.db"
         assert config.max_articles == 3
@@ -174,10 +173,10 @@ class TestChirpyConfig:
             "SPEECH_ENABLED": "false",
             "INTERACTIVE_MODE": "true",
         }
-        
+
         with patch.dict(os.environ, env_vars):
             config = ChirpyConfig.from_env()
-        
+
         assert config.database_path == "/tmp/test.db"
         assert config.max_articles == 5
         assert config.max_summary_length == 800
@@ -198,7 +197,7 @@ class TestChirpyConfig:
             "TTS_VOLUME": "invalid_float",
             "AUTO_MARK_READ": "not_a_boolean",
         }
-        
+
         with patch.dict(os.environ, env_vars):
             # Should not raise exception, but use defaults or handle gracefully
             with pytest.raises((ValueError, TypeError)):
@@ -212,9 +211,9 @@ class TestChirpyConfig:
             tts_rate=200,
             speech_enabled=False,
         )
-        
+
         config_dict = config.to_dict()
-        
+
         assert isinstance(config_dict, dict)
         assert config_dict["max_articles"] == 5
         assert config_dict["tts_rate"] == 200
@@ -226,7 +225,7 @@ class TestChirpyConfig:
     def test_openai_tts_config_defaults(self):
         """Test OpenAI TTS configuration defaults."""
         config = ChirpyConfig()
-        
+
         assert config.tts_quality == "hd"
         assert config.openai_tts_voice == "alloy"
         assert config.audio_format == "mp3"
@@ -241,10 +240,10 @@ class TestChirpyConfig:
             "AUDIO_FORMAT": "opus",
             "TTS_SPEED_MULTIPLIER": "1.5",
         }
-        
+
         with patch.dict(os.environ, env_vars):
             config = ChirpyConfig.from_env()
-        
+
         assert config.tts_quality == "standard"
         assert config.openai_tts_voice == "nova"
         assert config.audio_format == "opus"
@@ -254,7 +253,7 @@ class TestChirpyConfig:
     def test_translation_config_defaults(self):
         """Test translation configuration defaults."""
         config = ChirpyConfig()
-        
+
         assert config.auto_translate is True
         assert config.target_language == "ja"
         assert config.preserve_original is True
@@ -265,14 +264,14 @@ class TestChirpyConfig:
         """Test that post_init validation is applied correctly."""
         # Create config with invalid values
         config = ChirpyConfig()
-        
+
         # Manually set invalid values (bypassing __init__)
         config.max_articles = 200
         config.tts_volume = 2.0
-        
+
         # Call post_init to trigger validation
         config.__post_init__()
-        
+
         # Should be corrected to valid ranges
         assert config.max_articles == 100
         assert config.tts_volume == 1.0

@@ -61,6 +61,11 @@ disable_error_code = ["attr-defined", "union-attr", "arg-type"]
 [[tool.mypy.overrides]]
 module = ["interactive_ui", "interactive_ui_safe", "chirpy"]
 disable_error_code = ["assignment"]
+# Less strict checking for test files
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disable_error_code = ["no-untyped-def"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

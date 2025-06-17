@@ -104,7 +104,7 @@ def clean_env():
     env_vars = [
         "OPENAI_API_KEY",
         "OPENAI_MODEL",
-        "CHIRPY_DATABASE_PATH", 
+        "CHIRPY_DATABASE_PATH",
         "CHIRPY_MAX_ARTICLES",
         "CHIRPY_MAX_SUMMARY_LENGTH",
         "OPENAI_MAX_TOKENS",
@@ -132,14 +132,14 @@ def clean_env():
         "PRESERVE_ORIGINAL",
         "TRANSLATION_PROVIDER",
     ]
-    
+
     for var in env_vars:
         if var in os.environ:
             original_env[var] = os.environ[var]
             del os.environ[var]
-    
+
     yield
-    
+
     # Restore original values
     for var, value in original_env.items():
         os.environ[var] = value
