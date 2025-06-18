@@ -557,6 +557,14 @@ def main() -> None:
         # Apply CLI arguments to configuration
         config = apply_args_to_config(args, config)
 
+        # Security: Validate configuration for security issues
+        security_warnings = config.validate_security()
+        if security_warnings:
+            logger.warning("Security validation found issues:")
+            for warning in security_warnings:
+                logger.warning(f"  - {warning}")
+            print("⚠️  Security warnings found. Check logs for details.")
+
         # Handle special modes that don't require main application flow
         if handle_special_modes(args, config):
             return

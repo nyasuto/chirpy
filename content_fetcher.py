@@ -4,7 +4,10 @@ Content fetching and AI summarization module for Chirpy.
 Handles fetching article content from URLs and generating summaries using OpenAI API.
 """
 
+import html
+import re
 from typing import Any
+from urllib.parse import urlparse
 
 import requests  # type: ignore
 from bs4 import BeautifulSoup  # type: ignore
@@ -25,6 +28,11 @@ from config import ChirpyConfig, get_logger
 class ContentFetcher:
     """Handles content fetching and AI summarization."""
 
+    # Security: Maximum content length to prevent DoS
+    MAX_CONTENT_LENGTH = 1024 * 1024  # 1MB
+    MAX_URL_LENGTH = 2048
+    ALLOWED_SCHEMES = {"http", "https"}
+
     def __init__(self, config: ChirpyConfig) -> None:
         """Initialize the content fetcher."""
         self.config = config
@@ -42,6 +50,112 @@ class ContentFetcher:
                 self.logger.warning("OpenAI package not available")
             if not config.openai_api_key:
                 self.logger.warning("OPENAI_API_KEY not found in configuration")
+
+    def _validate_url(self, url: str) -> str:
+        """
+        Validate and sanitize URL for security.
+
+        Args:
+            url: URL to validate
+
+        Returns:
+            Validated URL
+
+        Raises:
+            ValueError: If URL is invalid or potentially malicious
+        """
+        if not url or not isinstance(url, str):
+            raise ValueError("URL must be a non-empty string")
+
+        if len(url) > self.MAX_URL_LENGTH:
+            raise ValueError(f"URL too long (max {self.MAX_URL_LENGTH} characters)")
+
+        try:
+            parsed = urlparse(url.strip())
+        except Exception as e:
+            raise ValueError(f"Invalid URL format: {e}") from e
+
+        if not parsed.scheme:
+            raise ValueError("URL must include a scheme (http/https)")
+
+        if parsed.scheme.lower() not in self.ALLOWED_SCHEMES:
+            raise ValueError(f"Unsupported URL scheme: {parsed.scheme}")
+
+        if not parsed.netloc:
+            raise ValueError("URL must include a domain")
+
+        # Check for potentially malicious patterns
+        suspicious_patterns = [
+            r"javascript:",
+            r"data:",
+            r"file:",
+            r"ftp:",
+            r"localhost",
+            r"127\.0\.0\.1",
+            r"0\.0\.0\.0",
+            r"::1",
+        ]
+
+        url_lower = url.lower()
+        for pattern in suspicious_patterns:
+            if re.search(pattern, url_lower):
+                raise ValueError(f"Potentially unsafe URL pattern detected: {pattern}")
+
+        return url
+
+    def _sanitize_html_content(self, content: str) -> str:
+        """
+        Sanitize HTML content to remove potentially dangerous elements.
+
+        Args:
+            content: Raw HTML content
+
+        Returns:
+            Sanitized content
+        """
+        if not content:
+            return ""
+
+        # Limit content length to prevent DoS
+        if len(content) > self.MAX_CONTENT_LENGTH:
+            content = content[: self.MAX_CONTENT_LENGTH]
+            self.logger.warning("Content truncated due to size limit")
+
+        # Remove potentially dangerous HTML elements
+        soup = BeautifulSoup(content, "html.parser")
+
+        # Remove script, style, and other potentially dangerous tags
+        dangerous_tags = [
+            "script",
+            "style",
+            "iframe",
+            "object",
+            "embed",
+            "form",
+            "input",
+        ]
+        for tag in dangerous_tags:
+            for element in soup.find_all(tag):
+                element.decompose()
+
+        # Remove dangerous attributes
+        dangerous_attrs = ["onclick", "onload", "onerror", "onmouseover", "javascript:"]
+        for element in soup.find_all():
+            # Type check: only Tags have attrs, not NavigableString or PageElement
+            if hasattr(element, "attrs") and element.attrs:
+                attrs_to_remove = []
+                for attr, value in element.attrs.items():
+                    if attr.lower() in dangerous_attrs:
+                        attrs_to_remove.append(attr)
+                    elif isinstance(value, str) and "javascript:" in value.lower():
+                        attrs_to_remove.append(attr)
+
+                for attr in attrs_to_remove:
+                    del element.attrs[attr]
+
+        # Convert back to string and escape any remaining HTML entities
+        sanitized = str(soup)
+        return html.escape(sanitized, quote=False)
 
     def detect_language(self, text: str) -> str:
         """
@@ -81,7 +195,9 @@ class ContentFetcher:
             Extracted article text or None if failed
         """
         try:
-            self.logger.info(f"Fetching content from: {url[:60]}...")
+            # Security: Validate URL before making request
+            validated_url = self._validate_url(url)
+            self.logger.info(f"Fetching content from: {validated_url[:60]}...")
 
             # Set headers to mimic a real browser
             headers = {
@@ -102,12 +218,22 @@ class ContentFetcher:
 
             # Make request with configured timeout
             response = requests.get(
-                url, headers=headers, timeout=self.config.fetch_timeout
+                validated_url, headers=headers, timeout=self.config.fetch_timeout
             )
             response.raise_for_status()
 
-            # Parse HTML content
-            soup = BeautifulSoup(response.content, "html.parser")
+            # Security: Check response content length
+            if hasattr(response, "headers") and "content-length" in response.headers:
+                content_length = int(response.headers["content-length"])
+                if content_length > self.MAX_CONTENT_LENGTH:
+                    raise ValueError(f"Response too large: {content_length} bytes")
+
+            # Security: Sanitize HTML content before processing
+            raw_content = response.content.decode("utf-8", errors="ignore")
+            sanitized_content = self._sanitize_html_content(raw_content)
+
+            # Parse sanitized HTML content
+            soup = BeautifulSoup(sanitized_content, "html.parser")
 
             # Remove unwanted elements
             for element in soup.find_all(

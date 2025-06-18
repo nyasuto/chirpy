@@ -321,8 +321,8 @@ def show_config(config: ChirpyConfig) -> None:
         for key in keys:
             value = config_dict.get(key)
             if key == "openai_api_key" and value:
-                # Mask API key for security
-                value = f"{value[:8]}..." if len(value) > 8 else "***"
+                # Completely mask API key for security - no partial exposure
+                value = "***configured***" if value else "***not_set***"
             print(f"  {key}: {value}")
 
     print()
