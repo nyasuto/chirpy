@@ -10,7 +10,7 @@ import tempfile
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from openai import OpenAI
 
@@ -83,6 +83,11 @@ class OpenAITTSProvider:
             try:
                 self.client = OpenAI(api_key=api_key)
                 self.logger.info("OpenAI TTS provider initialized")
+
+                # Perform startup cleanup if enabled
+                if self.config.audio_cache_cleanup_on_startup:
+                    self._cleanup_expired_cache()
+
             except Exception as e:
                 self.logger.warning(f"Failed to initialize OpenAI client: {e}")
         else:
@@ -123,7 +128,197 @@ class OpenAITTSProvider:
         cache_file = self.cache_dir / f"{cache_key}.mp3"
         with open(cache_file, "wb") as f:
             f.write(audio_data)
+
+        # Check if we need size-based cleanup after saving
+        self._check_cache_size_limits()
+
         return cache_file
+
+    def _cleanup_expired_cache(self) -> None:
+        """Remove expired cache files proactively."""
+        if not self.cache_dir.exists():
+            return
+
+        current_time = time.time()
+        max_age_seconds = self.config.audio_cache_max_age_days * 24 * 3600
+        removed_count = 0
+        removed_size = 0
+
+        try:
+            for cache_file in self.cache_dir.glob("*.mp3"):
+                try:
+                    file_age = current_time - cache_file.stat().st_mtime
+                    if file_age > max_age_seconds:
+                        file_size = cache_file.stat().st_size
+                        cache_file.unlink()
+                        removed_count += 1
+                        removed_size += file_size
+                        self.logger.debug(
+                            f"Removed expired cache file: {cache_file.name}"
+                        )
+
+                except OSError as e:
+                    self.logger.debug(f"Failed to remove cache file {cache_file}: {e}")
+
+        except Exception as e:
+            self.logger.warning(f"Error during cache cleanup: {e}")
+
+        if removed_count > 0:
+            size_mb = removed_size / (1024 * 1024)
+            self.logger.info(
+                f"Cache cleanup: removed {removed_count} expired files "
+                f"({size_mb:.1f} MB)"
+            )
+
+    def _get_cache_size_mb(self) -> float:
+        """Get current cache size in MB."""
+        if not self.cache_dir.exists():
+            return 0.0
+
+        total_size = 0
+        try:
+            for cache_file in self.cache_dir.glob("*.mp3"):
+                try:
+                    total_size += cache_file.stat().st_size
+                except OSError:
+                    continue  # Skip files we can't read
+        except Exception:
+            return 0.0
+
+        return total_size / (1024 * 1024)
+
+    def _check_cache_size_limits(self) -> None:
+        """Check cache size and perform cleanup if needed."""
+        current_size = self._get_cache_size_mb()
+        max_size = self.config.audio_cache_max_size_mb
+        threshold_size = max_size * self.config.audio_cache_cleanup_threshold
+
+        if current_size > threshold_size:
+            self.logger.info(
+                f"Cache size ({current_size:.1f} MB) exceeds threshold, cleaning up..."
+            )
+            self._cleanup_by_size(max_size)
+
+    def _cleanup_by_size(self, target_size_mb: float) -> None:
+        """Remove oldest cache files to stay within size limit."""
+        if not self.cache_dir.exists():
+            return
+
+        try:
+            # Get all cache files with their modification times
+            cache_files = []
+            for cache_file in self.cache_dir.glob("*.mp3"):
+                try:
+                    stat = cache_file.stat()
+                    cache_files.append((cache_file, stat.st_mtime, stat.st_size))
+                except OSError:
+                    continue
+
+            # Sort by modification time (oldest first)
+            cache_files.sort(key=lambda x: x[1])
+
+            current_size = sum(size for _, _, size in cache_files) / (1024 * 1024)
+            removed_count = 0
+            removed_size = 0
+
+            # Remove oldest files until we're under the target size
+            for cache_file, _, file_size in cache_files:
+                if current_size <= target_size_mb:
+                    break
+
+                try:
+                    cache_file.unlink()
+                    current_size -= file_size / (1024 * 1024)
+                    removed_size += file_size
+                    removed_count += 1
+                    self.logger.debug(f"Removed old cache file: {cache_file.name}")
+                except OSError as e:
+                    self.logger.debug(f"Failed to remove cache file {cache_file}: {e}")
+
+            if removed_count > 0:
+                size_mb = removed_size / (1024 * 1024)
+                self.logger.info(
+                    f"Size-based cleanup: removed {removed_count} files "
+                    f"({size_mb:.1f} MB)"
+                )
+
+        except Exception as e:
+            self.logger.warning(f"Error during size-based cleanup: {e}")
+
+    def get_cache_stats(self) -> dict[str, Any]:
+        """Get cache statistics."""
+        if not self.cache_dir.exists():
+            return {
+                "total_files": 0,
+                "total_size_mb": 0.0,
+                "oldest_file_age_days": 0,
+                "cache_dir": str(self.cache_dir),
+            }
+
+        try:
+            cache_files = list(self.cache_dir.glob("*.mp3"))
+            total_files = len(cache_files)
+
+            if total_files == 0:
+                return {
+                    "total_files": 0,
+                    "total_size_mb": 0.0,
+                    "oldest_file_age_days": 0,
+                    "cache_dir": str(self.cache_dir),
+                }
+
+            current_time = time.time()
+            total_size = 0
+            oldest_time = current_time
+
+            for cache_file in cache_files:
+                try:
+                    stat = cache_file.stat()
+                    total_size += stat.st_size
+                    oldest_time = min(oldest_time, stat.st_mtime)
+                except OSError:
+                    continue
+
+            oldest_age_days = (current_time - oldest_time) / (24 * 3600)
+
+            return {
+                "total_files": total_files,
+                "total_size_mb": total_size / (1024 * 1024),
+                "oldest_file_age_days": oldest_age_days,
+                "cache_dir": str(self.cache_dir),
+            }
+
+        except Exception as e:
+            self.logger.warning(f"Error getting cache stats: {e}")
+            return {
+                "total_files": 0,
+                "total_size_mb": 0.0,
+                "oldest_file_age_days": 0,
+                "cache_dir": str(self.cache_dir),
+                "error": str(e),
+            }
+
+    def clear_cache(self) -> int:
+        """Clear all cache files. Returns number of files removed."""
+        if not self.cache_dir.exists():
+            return 0
+
+        removed_count = 0
+        try:
+            for cache_file in self.cache_dir.glob("*.mp3"):
+                try:
+                    cache_file.unlink()
+                    removed_count += 1
+                except OSError as e:
+                    self.logger.debug(f"Failed to remove cache file {cache_file}: {e}")
+
+            if removed_count > 0:
+                self.logger.info(f"Cleared {removed_count} cache files")
+
+        except Exception as e:
+            self.logger.warning(f"Error clearing cache: {e}")
+
+        return removed_count
 
     def speak_text(self, text: str, voice: str | None = None) -> bool:
         """Generate and play speech using OpenAI TTS with caching."""
@@ -360,3 +555,24 @@ class EnhancedTTSService:
     def is_available(self) -> bool:
         """Check if service is available."""
         return len(self.providers) > 0
+
+    def get_cache_stats(self) -> dict[str, Any]:
+        """Get cache statistics from OpenAI provider."""
+        for provider in self.providers.values():
+            if isinstance(provider, OpenAITTSProvider):
+                return provider.get_cache_stats()
+        return {"error": "OpenAI TTS provider not available"}
+
+    def clear_cache(self) -> int:
+        """Clear cache files from OpenAI provider."""
+        for provider in self.providers.values():
+            if isinstance(provider, OpenAITTSProvider):
+                return provider.clear_cache()
+        return 0
+
+    def cleanup_cache(self) -> None:
+        """Manually trigger cache cleanup."""
+        for provider in self.providers.values():
+            if isinstance(provider, OpenAITTSProvider):
+                provider._cleanup_expired_cache()
+                break

@@ -772,7 +772,12 @@ class TestHandleSpecialModes:
         """Test handling when no special mode is activated."""
         config = ChirpyConfig()
         args = argparse.Namespace(
-            show_config=False, stats=False, translate_articles=False
+            show_config=False,
+            stats=False,
+            translate_articles=False,
+            cache_stats=False,
+            clear_cache=False,
+            cleanup_cache=False,
         )
 
         result = handle_special_modes(args, config)
