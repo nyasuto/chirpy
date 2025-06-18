@@ -429,8 +429,7 @@ class ChirpyReader:
 
             # Article selection
             if self.config.select_articles:
-                selected_indices = self.article_selector.show_article_menu(all_articles)
-                articles = [all_articles[i] for i in selected_indices]
+                articles = self.article_selector.show_article_menu(all_articles)
             else:
                 articles = all_articles[: self.config.max_articles]
 
@@ -473,7 +472,7 @@ class ChirpyReader:
                 if self.interactive_controller:
                     self.interactive_controller.update_progress(i, article["title"])
 
-                self.progress_tracker.update_statistics(article)
+                self.progress_tracker.update_statistics(article=article)
 
                 # Process article for language detection and translation if needed
                 processed_article = self.process_article_for_reading(article)
