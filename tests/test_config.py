@@ -227,7 +227,7 @@ class TestChirpyConfig:
         config = ChirpyConfig()
 
         assert config.tts_quality == "hd"
-        assert config.openai_tts_voice == "alloy"
+        assert config.openai_tts_voice == "nova"
         assert config.audio_format == "mp3"
         assert config.tts_speed_multiplier == 1.0
 
