@@ -5,59 +5,35 @@ Provides keyboard controls and rich terminal formatting with graceful
 fallbacks for environments where keyboard library is not available.
 """
 
-import threading
 import time
 from collections.abc import Callable
-from enum import Enum
 from typing import Any
 
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from config import ChirpyConfig, get_logger
+from base_ui import (
+    BaseArticleSelector,
+    BaseInteractiveController,
+    BaseProgressTracker,
+    PlaybackState,
+)
+from config import ChirpyConfig
 
 
-class PlaybackState(Enum):
-    """Playback control states."""
-
-    PLAYING = "playing"
-    PAUSED = "paused"
-    STOPPED = "stopped"
-    SKIPPING = "skipping"
-
-
-class InteractiveController:
+class InteractiveController(BaseInteractiveController):
     """Handles keyboard input and playback control during article reading."""
 
     def __init__(self, config: ChirpyConfig):
         """Initialize interactive controller."""
-        self.config = config
-        self.logger = get_logger(__name__)
-        self.console = Console()
-
-        # Playback state
-        self.state = PlaybackState.STOPPED
-        self.current_article_index = 0
-        self.total_articles = 0
-        self.current_speed_multiplier = 1.0
-        self.volume_level = config.tts_volume
-
-        # Control callbacks
-        self.pause_callback: Callable[[], None] | None = None
-        self.resume_callback: Callable[[], None] | None = None
-        self.skip_callback: Callable[[], None] | None = None
-        self.speed_callback: Callable[[float], None] | None = None
-        self.volume_callback: Callable[[float], None] | None = None
-        self.stop_callback: Callable[[], None] | None = None
-
-        # Threading
-        self.input_thread: threading.Thread | None = None
-        self.running = False
-        self._lock = threading.Lock()
+        super().__init__(config)
 
         # Try to setup keyboard hooks safely
         self.keyboard_available = self._setup_keyboard_hooks_safe()
+
+    def _setup_keyboard_hooks(self) -> None:
+        """Setup keyboard hooks (overrides base method)."""
+        self._setup_keyboard_hooks_safe()
 
     def _setup_keyboard_hooks_safe(self) -> bool:
         """Safely set up keyboard event handlers."""
@@ -65,16 +41,16 @@ class InteractiveController:
             # Import keyboard only when needed
             import keyboard
 
-            keyboard.on_press_key("space", self._handle_space_key)
-            keyboard.on_press_key("right", self._handle_right_arrow)
-            keyboard.on_press_key("left", self._handle_left_arrow)
-            keyboard.on_press_key("up", self._handle_up_arrow)
-            keyboard.on_press_key("down", self._handle_down_arrow)
-            keyboard.on_press_key("=", self._handle_speed_up)
-            keyboard.on_press_key("-", self._handle_speed_down)
-            keyboard.on_press_key("q", self._handle_quit)
-            keyboard.on_press_key("h", self._handle_help)
-            keyboard.on_press_key("s", self._handle_save_session)
+            keyboard.on_press_key("space", self._on_space_key)
+            keyboard.on_press_key("right", self._on_right_arrow)
+            keyboard.on_press_key("left", self._on_left_arrow)
+            keyboard.on_press_key("up", self._on_up_arrow)
+            keyboard.on_press_key("down", self._on_down_arrow)
+            keyboard.on_press_key("=", self._on_speed_up)
+            keyboard.on_press_key("-", self._on_speed_down)
+            keyboard.on_press_key("q", self._on_quit)
+            keyboard.on_press_key("h", self._on_help)
+            keyboard.on_press_key("s", self._on_save_session)
 
             self.logger.info("Interactive keyboard controls enabled")
             return True
@@ -83,116 +59,97 @@ class InteractiveController:
             self.logger.info("Interactive mode will use basic controls only")
             return False
 
-    def _handle_space_key(self, event: Any) -> None:
-        """Handle spacebar press for pause/resume."""
+    def _on_space_key(self, event: Any) -> None:
+        """Handle spacebar press for pause/resume (keyboard event wrapper)."""
         with self._lock:
-            if self.state == PlaybackState.PLAYING:
-                self._pause_playback()
-            elif self.state == PlaybackState.PAUSED:
-                self._resume_playback()
+            super()._handle_space_key()
 
-    def _handle_right_arrow(self, event: Any) -> None:
-        """Handle right arrow for skip forward."""
+    def _on_right_arrow(self, event: Any) -> None:
+        """Handle right arrow for skip forward (keyboard event wrapper)."""
         with self._lock:
-            if self.state in [PlaybackState.PLAYING, PlaybackState.PAUSED]:
-                self._skip_forward()
+            super()._handle_right_arrow()
 
-    def _handle_left_arrow(self, event: Any) -> None:
-        """Handle left arrow for previous article."""
+    def _on_left_arrow(self, event: Any) -> None:
+        """Handle left arrow for previous article (keyboard event wrapper)."""
         with self._lock:
-            if self.state in [PlaybackState.PLAYING, PlaybackState.PAUSED]:
-                self._skip_backward()
+            super()._handle_left_arrow()
 
-    def _handle_up_arrow(self, event: Any) -> None:
-        """Handle up arrow for volume up."""
+    def _on_up_arrow(self, event: Any) -> None:
+        """Handle up arrow for volume up (keyboard event wrapper)."""
         with self._lock:
             self._adjust_volume(0.1)
+            volume_percent = int(self.volume_level * 100)
+            self.console.print(f"[cyan]🔊 Volume: {volume_percent}%[/cyan]")
+            self.logger.info(f"Volume adjusted to {volume_percent}%")
 
-    def _handle_down_arrow(self, event: Any) -> None:
-        """Handle down arrow for volume down."""
+    def _on_down_arrow(self, event: Any) -> None:
+        """Handle down arrow for volume down (keyboard event wrapper)."""
         with self._lock:
             self._adjust_volume(-0.1)
+            volume_percent = int(self.volume_level * 100)
+            self.console.print(f"[cyan]🔊 Volume: {volume_percent}%[/cyan]")
+            self.logger.info(f"Volume adjusted to {volume_percent}%")
 
-    def _handle_speed_up(self, event: Any) -> None:
-        """Handle + key for speed increase."""
+    def _on_speed_up(self, event: Any) -> None:
+        """Handle + key for speed increase (keyboard event wrapper)."""
         with self._lock:
             self._adjust_speed(0.2)
+            speed_text = f"🎚️ Speed: {self.current_speed_multiplier:.1f}x"
+            self.console.print(f"[cyan]{speed_text}[/cyan]")
+            self.logger.info(f"Speed adjusted to {self.current_speed_multiplier:.1f}x")
 
-    def _handle_speed_down(self, event: Any) -> None:
-        """Handle - key for speed decrease."""
+    def _on_speed_down(self, event: Any) -> None:
+        """Handle - key for speed decrease (keyboard event wrapper)."""
         with self._lock:
             self._adjust_speed(-0.2)
+            speed_text = f"🎚️ Speed: {self.current_speed_multiplier:.1f}x"
+            self.console.print(f"[cyan]{speed_text}[/cyan]")
+            self.logger.info(f"Speed adjusted to {self.current_speed_multiplier:.1f}x")
 
-    def _handle_quit(self, event: Any) -> None:
-        """Handle q key for quit."""
+    def _on_quit(self, event: Any) -> None:
+        """Handle q key for quit (keyboard event wrapper)."""
         with self._lock:
-            self._stop_playback()
+            super()._handle_quit()
 
-    def _handle_help(self, event: Any) -> None:
-        """Handle h key for help display."""
-        self._show_help()
+    def _on_help(self, event: Any) -> None:
+        """Handle h key for help display (keyboard event wrapper)."""
+        super()._handle_help()
 
-    def _handle_save_session(self, event: Any) -> None:
-        """Handle s key for save session."""
+    def _on_save_session(self, event: Any) -> None:
+        """Handle s key for save session (keyboard event wrapper)."""
         # TODO: Implement session saving
         self.console.print("[yellow]Session saving not yet implemented[/yellow]")
 
     def _pause_playback(self) -> None:
-        """Pause current playback."""
-        if self.state == PlaybackState.PLAYING and self.pause_callback:
-            self.state = PlaybackState.PAUSED
-            self.pause_callback()
+        """Pause current playback (override for safe mode display)."""
+        super()._pause_playback()
+        if self.state == PlaybackState.PAUSED:
             self.console.print("[yellow]⏸️  Paused[/yellow]")
             self.logger.info("Playback paused by user")
 
     def _resume_playback(self) -> None:
-        """Resume paused playback."""
-        if self.state == PlaybackState.PAUSED and self.resume_callback:
-            self.state = PlaybackState.PLAYING
-            self.resume_callback()
+        """Resume paused playback (override for safe mode display)."""
+        super()._resume_playback()
+        if self.state == PlaybackState.PLAYING:
             self.console.print("[green]▶️  Resumed[/green]")
             self.logger.info("Playback resumed by user")
 
     def _skip_forward(self) -> None:
-        """Skip to next article."""
+        """Skip to next article (override for safe mode display)."""
         if self.skip_callback and self.current_article_index < self.total_articles - 1:
-            self.state = PlaybackState.SKIPPING
-            self.skip_callback()
+            super()._skip_forward()
             self.console.print("[blue]⏭️  Skipping to next article[/blue]")
             self.logger.info("Skipped to next article")
 
     def _skip_backward(self) -> None:
-        """Skip to previous article."""
+        """Skip to previous article (override for safe mode display)."""
         if self.current_article_index > 0:
             self.console.print("[blue]⏮️  Previous article (not yet implemented)[/blue]")
             # TODO: Implement previous article functionality
 
-    def _adjust_speed(self, delta: float) -> None:
-        """Adjust playback speed."""
-        new_speed = max(0.5, min(2.0, self.current_speed_multiplier + delta))
-        if new_speed != self.current_speed_multiplier:
-            self.current_speed_multiplier = new_speed
-            if self.speed_callback:
-                self.speed_callback(new_speed)
-            self.console.print(f"[cyan]🎚️ Speed: {new_speed:.1f}x[/cyan]")
-            self.logger.info(f"Speed adjusted to {new_speed:.1f}x")
-
-    def _adjust_volume(self, delta: float) -> None:
-        """Adjust playback volume."""
-        new_volume = max(0.0, min(1.0, self.volume_level + delta))
-        if new_volume != self.volume_level:
-            self.volume_level = new_volume
-            if self.volume_callback:
-                self.volume_callback(new_volume)
-            volume_percent = int(new_volume * 100)
-            self.console.print(f"[cyan]🔊 Volume: {volume_percent}%[/cyan]")
-            self.logger.info(f"Volume adjusted to {volume_percent}%")
-
     def _stop_playback(self) -> None:
-        """Stop playback and exit."""
-        self.state = PlaybackState.STOPPED
-        if self.stop_callback:
-            self.stop_callback()
+        """Stop playback and exit (override for safe mode display)."""
+        super()._stop_playback()
         self.console.print("[red]⏹️  Stopping playback[/red]")
         self.logger.info("Playback stopped by user")
 
@@ -219,7 +176,7 @@ class InteractiveController:
 
         self.console.print(Panel(help_table, border_style="blue"))
 
-    def set_callbacks(
+    def set_legacy_callbacks(
         self,
         pause: Callable[[], None] | None = None,
         resume: Callable[[], None] | None = None,
@@ -228,20 +185,21 @@ class InteractiveController:
         volume: Callable[[float], None] | None = None,
         stop: Callable[[], None] | None = None,
     ) -> None:
-        """Set callback functions for playback control."""
-        self.pause_callback = pause
-        self.resume_callback = resume
-        self.skip_callback = skip
-        self.speed_callback = speed
-        self.volume_callback = volume
-        self.stop_callback = stop
+        """Set callback functions for playback control (legacy interface)."""
+        # Map old callback names to new ones
+        super().set_callbacks(
+            pause_callback=pause,
+            resume_callback=resume,
+            skip_callback=skip,
+            speed_callback=speed,
+            volume_callback=volume,
+            quit_callback=stop,
+        )
 
     def start_session(self, total_articles: int) -> None:
         """Start interactive session."""
-        self.total_articles = total_articles
-        self.current_article_index = 0
+        super().start_session(total_articles)
         self.state = PlaybackState.PLAYING
-        self.running = True
 
         # Show initial help
         self.console.print("[bold green]🎧 Interactive Mode Enabled[/bold green]")
@@ -249,9 +207,10 @@ class InteractiveController:
             self.console.print("Press [bold cyan]H[/bold cyan] for keyboard shortcuts")
         else:
             self.console.print("Keyboard controls not available - use Ctrl+C to quit")
-        self.logger.info(f"Started interactive session with {total_articles} articles")
 
-    def update_progress(self, article_index: int, article_title: str) -> None:
+    def update_progress(
+        self, article_index: int, article_title: str, words_spoken: int = 0
+    ) -> None:
         """Update current playback progress."""
         with self._lock:
             self.current_article_index = article_index
@@ -276,7 +235,7 @@ class InteractiveController:
 
     def end_session(self) -> None:
         """End interactive session and cleanup."""
-        self.running = False
+        self._running = False
         self.state = PlaybackState.STOPPED
 
         if self.keyboard_available:
@@ -291,17 +250,14 @@ class InteractiveController:
         self.logger.info("Interactive session ended")
 
 
-# Re-implement ArticleSelector and ProgressTracker classes
-class ArticleSelector:
+class ArticleSelector(BaseArticleSelector):
     """Interactive article selection interface - safe version."""
 
     def __init__(self, config: ChirpyConfig):
         """Initialize article selector."""
-        self.config = config
-        self.console = Console()
-        self.logger = get_logger(__name__)
+        super().__init__(config)
 
-    def show_article_menu(self, articles: list[dict[str, Any]]) -> list[int]:
+    def show_article_menu(self, articles: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Show article selection - simplified safe version."""
         if not articles:
             self.console.print("[yellow]No articles available[/yellow]")
@@ -310,31 +266,44 @@ class ArticleSelector:
         self.console.print("[bold blue]📰 Article Selection (Auto-mode)[/bold blue]")
 
         # Auto-select unread articles
-        selected_indices = [
-            i for i, article in enumerate(articles) if not article.get("read", False)
+        selected_articles = [
+            article for article in articles if not article.get("read", False)
         ]
 
-        return selected_indices[: self.config.max_articles]
+        return selected_articles[: self.config.max_articles]
 
 
-class ProgressTracker:
+class ProgressTracker(BaseProgressTracker):
     """Tracks and displays reading progress - safe version."""
 
     def __init__(self, config: ChirpyConfig):
         """Initialize progress tracker."""
-        self.config = config
-        self.console = Console()
-        self.logger = get_logger(__name__)
+        super().__init__(config)
         self.session_start = time.time()
         self.articles_read = 0
         self.words_read = 0
 
-    def update_statistics(self, article: dict[str, Any]) -> None:
+    def update_statistics(self, **kwargs: Any) -> None:
         """Update reading statistics."""
-        self.articles_read += 1
-        title_words = len(article.get("title", "").split())
-        summary_words = len(article.get("summary", "").split())
-        self.words_read += title_words + summary_words
+        # Handle both old-style article dict and new kwargs style
+        if "article" in kwargs:
+            article = kwargs["article"]
+            self.articles_read += 1
+            title_words = len(article.get("title", "").split())
+            summary_words = len(article.get("summary", "").split())
+            self.words_read += title_words + summary_words
+
+            # Update base class statistics
+            super().update_statistics(
+                articles_processed=1, total_words=title_words + summary_words
+            )
+        else:
+            # Pass through to base class
+            super().update_statistics(**kwargs)
+
+    def update_article_statistics(self, article: dict[str, Any]) -> None:
+        """Update reading statistics for a specific article."""
+        self.update_statistics(article=article)
 
     def show_session_summary(self) -> None:
         """Display session reading summary."""
