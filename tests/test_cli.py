@@ -602,9 +602,10 @@ class TestShowConfig:
             print_args = [call[0][0] for call in mock_print.call_args_list if call[0]]
             output_text = " ".join(print_args)
 
-            # API key should be masked
-            assert "sk-test1..." in output_text
+            # API key should be completely masked (security improvement)
+            assert "***configured***" in output_text
             assert "sk-test123456789012345" not in output_text
+            assert "sk-test1" not in output_text  # No partial exposure
 
     @pytest.mark.unit
     def test_show_config_short_api_key(self):
