@@ -144,6 +144,7 @@ class TestContentFetcher:
             </body>
         </html>
         """
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.raise_for_status.return_value = None
 
         with patch("content_fetcher.requests.get") as mock_get:
@@ -175,6 +176,7 @@ class TestContentFetcher:
             </body>
         </html>
         """
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.raise_for_status.return_value = None
 
         with patch("content_fetcher.requests.get") as mock_get:
@@ -204,6 +206,7 @@ class TestContentFetcher:
             </body>
         </html>
         """
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.raise_for_status.return_value = None
 
         with patch("content_fetcher.requests.get") as mock_get:
@@ -238,6 +241,7 @@ class TestContentFetcher:
             </body>
         </html>
         """
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.raise_for_status.return_value = None
 
         with patch("content_fetcher.requests.get") as mock_get:
@@ -269,6 +273,7 @@ class TestContentFetcher:
             </body>
         </html>
         """.encode()
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.raise_for_status.return_value = None
 
         with patch("content_fetcher.requests.get") as mock_get:
@@ -316,6 +321,7 @@ class TestContentFetcher:
         mock_response.content = (
             b"<html><head><title>Empty</title></head><body></body></html>"
         )
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.raise_for_status.return_value = None
 
         with patch("content_fetcher.requests.get") as mock_get:
@@ -653,6 +659,7 @@ class TestContentFetcher:
 
         mock_response = Mock()
         mock_response.content = b"<html><body><p>Content</p></body></html>"
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.raise_for_status.return_value = None
 
         with patch("content_fetcher.requests.get") as mock_get:

@@ -6,6 +6,7 @@ Handles application settings, environment variables, and logging configuration.
 
 import logging
 import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -132,6 +133,104 @@ class ChirpyConfig:
             field.name: getattr(self, field.name)
             for field in self.__dataclass_fields__.values()
         }
+
+    def validate_security(self) -> list[str]:
+        """
+        Validate configuration for security issues.
+
+        Returns:
+            List of security warnings/issues found
+        """
+        warnings = []
+
+        # Check API key security
+        if self.openai_api_key:
+            if len(self.openai_api_key) < 20:
+                warnings.append("OpenAI API key appears too short - may be invalid")
+            if not self.openai_api_key.startswith(("sk-", "sk_")):
+                warnings.append("OpenAI API key format looks suspicious")
+
+        # Check file permissions for sensitive files
+        sensitive_files = [
+            self.database_path,
+            ".env",
+            "config.toml",
+        ]
+
+        for file_path in sensitive_files:
+            path_obj = Path(file_path)
+            if path_obj.exists():
+                perms = self._check_file_permissions(path_obj)
+                if perms:
+                    warnings.extend(perms)
+
+        # Check log file security
+        if self.log_file:
+            log_path = Path(self.log_file)
+            if log_path.exists():
+                perms = self._check_file_permissions(log_path)
+                if perms:
+                    warnings.extend(perms)
+
+        return warnings
+
+    def _check_file_permissions(self, file_path: Path) -> list[str]:
+        """
+        Check file permissions for security issues.
+
+        Args:
+            file_path: Path to file to check
+
+        Returns:
+            List of permission-related warnings
+        """
+        warnings = []
+
+        try:
+            file_stat = file_path.stat()
+            mode = file_stat.st_mode
+
+            # Check if file is world-readable
+            if mode & stat.S_IROTH:
+                warnings.append(
+                    f"{file_path} is world-readable - may expose sensitive data"
+                )
+
+            # Check if file is world-writable
+            if mode & stat.S_IWOTH:
+                warnings.append(f"{file_path} is world-writable - security risk")
+
+            # Check if file is group-writable (less critical)
+            if mode & stat.S_IWGRP:
+                warnings.append(
+                    f"{file_path} is group-writable - potential security risk"
+                )
+
+        except (OSError, PermissionError) as e:
+            warnings.append(f"Could not check permissions for {file_path}: {e}")
+
+        return warnings
+
+    def secure_file_permissions(self, file_path: str) -> bool:
+        """
+        Set secure permissions on a file (owner read/write only).
+
+        Args:
+            file_path: Path to file to secure
+
+        Returns:
+            True if permissions were set successfully
+        """
+        try:
+            path_obj = Path(file_path)
+            if path_obj.exists():
+                # Set permissions to owner read/write only (600)
+                path_obj.chmod(stat.S_IRUSR | stat.S_IWUSR)
+                return True
+        except (OSError, PermissionError) as e:
+            print(f"Warning: Could not secure permissions for {file_path}: {e}")
+
+        return False
 
 
 class ChirpyLogger:
