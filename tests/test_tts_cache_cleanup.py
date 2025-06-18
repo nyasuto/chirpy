@@ -241,24 +241,29 @@ class TestTTSCacheCleanup:
     ):
         """Test that EnhancedTTSService properly delegates cache methods."""
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            service = EnhancedTTSService(config_with_cache_settings)
+            # Mock pyttsx3 to avoid platform dependencies in CI
+            with patch("pyttsx3.init") as mock_pyttsx3_init:
+                mock_engine = Mock()
+                mock_pyttsx3_init.return_value = mock_engine
 
-            # Set temp cache dir to avoid interfering with actual cache
-            for provider in service.providers.values():
-                if hasattr(provider, "cache_dir"):
-                    provider.cache_dir = temp_cache_dir
+                service = EnhancedTTSService(config_with_cache_settings)
 
-            # Test that cache methods are available and callable
-            stats = service.get_cache_stats()
-            assert isinstance(stats, dict)
-            assert "total_files" in stats
+                # Set temp cache dir to avoid interfering with actual cache
+                for provider in service.providers.values():
+                    if hasattr(provider, "cache_dir"):
+                        provider.cache_dir = temp_cache_dir
 
-            # Test clear cache returns a number
-            count = service.clear_cache()
-            assert isinstance(count, int)
+                # Test that cache methods are available and callable
+                stats = service.get_cache_stats()
+                assert isinstance(stats, dict)
+                assert "total_files" in stats
 
-            # Test cleanup cache doesn't raise an error
-            service.cleanup_cache()  # Should not raise exception
+                # Test clear cache returns a number
+                count = service.clear_cache()
+                assert isinstance(count, int)
+
+                # Test cleanup cache doesn't raise an error
+                service.cleanup_cache()  # Should not raise exception
 
     @pytest.mark.unit
     def test_cache_cleanup_error_handling(
