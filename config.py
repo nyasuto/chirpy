@@ -37,7 +37,7 @@ class ChirpyConfig:
 
     # OpenAI TTS settings
     tts_quality: str = "hd"  # 'basic', 'standard', 'hd'
-    openai_tts_voice: str = "alloy"  # alloy, echo, fable, onyx, nova, shimmer
+    openai_tts_voice: str = "nova"  # alloy, echo, fable, onyx, nova, shimmer
     audio_format: str = "mp3"  # mp3, opus, aac, flac
     tts_speed_multiplier: float = 1.0  # 0.25 to 4.0
 
@@ -102,7 +102,7 @@ class ChirpyConfig:
             tts_rate=int(os.getenv("TTS_RATE", "180")),
             tts_volume=float(os.getenv("TTS_VOLUME", "0.9")),
             tts_quality=os.getenv("TTS_QUALITY", "hd"),
-            openai_tts_voice=os.getenv("OPENAI_TTS_VOICE", "alloy"),
+            openai_tts_voice=os.getenv("OPENAI_TTS_VOICE", "nova"),
             audio_format=os.getenv("AUDIO_FORMAT", "mp3"),
             tts_speed_multiplier=float(os.getenv("TTS_SPEED_MULTIPLIER", "1.0")),
             fetch_timeout=int(os.getenv("FETCH_TIMEOUT", "30")),
