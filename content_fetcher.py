@@ -4,7 +4,6 @@ Content fetching and AI summarization module for Chirpy.
 Handles fetching article content from URLs and generating summaries using OpenAI API.
 """
 
-import html
 import re
 from typing import Any
 from urllib.parse import urlparse
@@ -153,9 +152,9 @@ class ContentFetcher:
                 for attr in attrs_to_remove:
                     del element.attrs[attr]
 
-        # Convert back to string and escape any remaining HTML entities
+        # Convert back to string
         sanitized = str(soup)
-        return html.escape(sanitized, quote=False)
+        return sanitized
 
     def detect_language(self, text: str) -> str:
         """
