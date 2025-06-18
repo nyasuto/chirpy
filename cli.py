@@ -25,6 +25,9 @@ Examples:
   %(prog)s --no-speech              # Skip text-to-speech (silent mode)
   %(prog)s --log-level DEBUG        # Enable debug logging
   %(prog)s --config-file my.env     # Use custom environment file
+  %(prog)s --cache-stats            # Show audio cache statistics
+  %(prog)s --clear-cache            # Clear all cached audio files
+  %(prog)s --cleanup-cache          # Remove expired cache files
 
 For more information, see: https://github.com/nyasuto/chirpy
         """,
@@ -41,6 +44,21 @@ For more information, see: https://github.com/nyasuto/chirpy
         "--stats",
         action="store_true",
         help="Show database statistics and exit",
+    )
+    mode_group.add_argument(
+        "--cache-stats",
+        action="store_true",
+        help="Show audio cache statistics and exit",
+    )
+    mode_group.add_argument(
+        "--clear-cache",
+        action="store_true",
+        help="Clear all audio cache files and exit",
+    )
+    mode_group.add_argument(
+        "--cleanup-cache",
+        action="store_true",
+        help="Clean up expired audio cache files and exit",
     )
 
     # Database options
@@ -417,6 +435,60 @@ def handle_special_modes(args: argparse.Namespace, config: ChirpyConfig) -> bool
                 print(f"❌ Error processing article {article['id']}: {e}")
 
         print(f"\n🎉 Translation complete! {processed} articles translated")
+        return True
+
+    if args.cache_stats:
+        from tts_service import EnhancedTTSService
+
+        print("🎵 Audio Cache Statistics")
+        print("=" * 40)
+
+        tts_service = EnhancedTTSService(config)
+        stats = tts_service.get_cache_stats()
+
+        if "error" in stats:
+            print(f"❌ {stats['error']}")
+        else:
+            print(f"📁 Cache directory: {stats['cache_dir']}")
+            print(f"📄 Total files: {stats['total_files']}")
+            print(f"💾 Total size: {stats['total_size_mb']:.1f} MB")
+            print(f"📅 Oldest file age: {stats['oldest_file_age_days']:.1f} days")
+            print(f"⚙️  Max cache size: {config.audio_cache_max_size_mb} MB")
+            print(f"🕐 Max file age: {config.audio_cache_max_age_days} days")
+
+            # Show percentage of max size
+            if config.audio_cache_max_size_mb > 0:
+                usage_pct = (
+                    stats["total_size_mb"] / config.audio_cache_max_size_mb
+                ) * 100
+                print(f"📊 Cache usage: {usage_pct:.1f}% of maximum")
+
+        return True
+
+    if args.clear_cache:
+        from tts_service import EnhancedTTSService
+
+        print("🗑️  Clearing audio cache...")
+
+        tts_service = EnhancedTTSService(config)
+        removed_count = tts_service.clear_cache()
+
+        if removed_count > 0:
+            print(f"✅ Cleared {removed_count} cache files")
+        else:
+            print("ℹ️  No cache files to clear")
+
+        return True
+
+    if args.cleanup_cache:
+        from tts_service import EnhancedTTSService
+
+        print("🧹 Cleaning up expired cache files...")
+
+        tts_service = EnhancedTTSService(config)
+        tts_service.cleanup_cache()
+
+        print("✅ Cache cleanup completed")
         return True
 
     return False

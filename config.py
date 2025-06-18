@@ -14,6 +14,14 @@ from typing import Any
 from dotenv import load_dotenv
 
 
+def _parse_env_value(value: str | None) -> str | None:
+    """Parse environment variable value, removing inline comments."""
+    if value is None:
+        return None
+    # Split on # and take first part, then strip whitespace
+    return value.split("#")[0].strip() or None
+
+
 @dataclass
 class ChirpyConfig:
     """Configuration settings for Chirpy application."""
@@ -66,6 +74,12 @@ class ChirpyConfig:
     preserve_original: bool = True
     translation_provider: str = "openai"
 
+    # Audio cache management settings
+    audio_cache_max_size_mb: int = 100  # Maximum cache size in MB
+    audio_cache_max_age_days: int = 30  # File expiration time in days
+    audio_cache_cleanup_on_startup: bool = True  # Clean expired files on startup
+    audio_cache_cleanup_threshold: float = 0.8  # Cleanup at 80% of max size
+
     def __post_init__(self) -> None:
         """Post-initialization processing."""
         # Convert string paths to Path objects if needed
@@ -93,38 +107,85 @@ class ChirpyConfig:
 
         return cls(
             database_path=os.getenv("CHIRPY_DATABASE_PATH", "data/articles.db"),
-            max_articles=int(os.getenv("CHIRPY_MAX_ARTICLES", "3")),
-            max_summary_length=int(os.getenv("CHIRPY_MAX_SUMMARY_LENGTH", "500")),
+            max_articles=int(_parse_env_value(os.getenv("CHIRPY_MAX_ARTICLES")) or "3"),
+            max_summary_length=int(
+                _parse_env_value(os.getenv("CHIRPY_MAX_SUMMARY_LENGTH")) or "500"
+            ),
             openai_api_key=os.getenv("OPENAI_API_KEY"),
             openai_model=os.getenv("OPENAI_MODEL", "gpt-4o"),
-            openai_max_tokens=int(os.getenv("OPENAI_MAX_TOKENS", "500")),
-            openai_temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.3")),
+            openai_max_tokens=int(
+                _parse_env_value(os.getenv("OPENAI_MAX_TOKENS")) or "500"
+            ),
+            openai_temperature=float(
+                _parse_env_value(os.getenv("OPENAI_TEMPERATURE")) or "0.3"
+            ),
             tts_engine=os.getenv("TTS_ENGINE", "pyttsx3"),
-            tts_rate=int(os.getenv("TTS_RATE", "180")),
-            tts_volume=float(os.getenv("TTS_VOLUME", "0.9")),
+            tts_rate=int(_parse_env_value(os.getenv("TTS_RATE")) or "180"),
+            tts_volume=float(_parse_env_value(os.getenv("TTS_VOLUME")) or "0.9"),
             tts_quality=os.getenv("TTS_QUALITY", "hd"),
             openai_tts_voice=os.getenv("OPENAI_TTS_VOICE", "nova"),
             audio_format=os.getenv("AUDIO_FORMAT", "mp3"),
-            tts_speed_multiplier=float(os.getenv("TTS_SPEED_MULTIPLIER", "1.0")),
-            fetch_timeout=int(os.getenv("FETCH_TIMEOUT", "30")),
-            rate_limit_delay=int(os.getenv("RATE_LIMIT_DELAY", "2")),
+            tts_speed_multiplier=float(
+                _parse_env_value(os.getenv("TTS_SPEED_MULTIPLIER")) or "1.0"
+            ),
+            fetch_timeout=int(_parse_env_value(os.getenv("FETCH_TIMEOUT")) or "30"),
+            rate_limit_delay=int(
+                _parse_env_value(os.getenv("RATE_LIMIT_DELAY")) or "2"
+            ),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             log_format=os.getenv(
                 "LOG_FORMAT",
                 "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             ),
             log_file=os.getenv("LOG_FILE"),
-            log_max_bytes=int(os.getenv("LOG_MAX_BYTES", str(10 * 1024 * 1024))),
-            log_backup_count=int(os.getenv("LOG_BACKUP_COUNT", "3")),
-            auto_mark_read=os.getenv("AUTO_MARK_READ", "true").lower() == "true",
-            pause_between_articles=os.getenv("PAUSE_BETWEEN_ARTICLES", "true").lower()
+            log_max_bytes=int(
+                _parse_env_value(os.getenv("LOG_MAX_BYTES")) or str(10 * 1024 * 1024)
+            ),
+            log_backup_count=int(
+                _parse_env_value(os.getenv("LOG_BACKUP_COUNT")) or "3"
+            ),
+            auto_mark_read=(
+                _parse_env_value(os.getenv("AUTO_MARK_READ")) or "true"
+            ).lower()
             == "true",
-            interactive_mode=os.getenv("INTERACTIVE_MODE", "false").lower() == "true",
-            speech_enabled=os.getenv("SPEECH_ENABLED", "true").lower() == "true",
-            auto_translate=os.getenv("AUTO_TRANSLATE", "true").lower() == "true",
+            pause_between_articles=(
+                _parse_env_value(os.getenv("PAUSE_BETWEEN_ARTICLES")) or "true"
+            ).lower()
+            == "true",
+            interactive_mode=(
+                _parse_env_value(os.getenv("INTERACTIVE_MODE")) or "false"
+            ).lower()
+            == "true",
+            speech_enabled=(
+                _parse_env_value(os.getenv("SPEECH_ENABLED")) or "true"
+            ).lower()
+            == "true",
+            auto_translate=(
+                _parse_env_value(os.getenv("AUTO_TRANSLATE")) or "true"
+            ).lower()
+            == "true",
             target_language=os.getenv("TARGET_LANGUAGE", "ja"),
-            preserve_original=os.getenv("PRESERVE_ORIGINAL", "true").lower() == "true",
+            preserve_original=(
+                _parse_env_value(os.getenv("PRESERVE_ORIGINAL")) or "true"
+            ).lower()
+            == "true",
             translation_provider=os.getenv("TRANSLATION_PROVIDER", "openai"),
+            audio_cache_max_size_mb=int(
+                _parse_env_value(os.getenv("AUDIO_CACHE_MAX_SIZE_MB")) or "100"
+            ),
+            audio_cache_max_age_days=int(
+                _parse_env_value(os.getenv("AUDIO_CACHE_MAX_AGE_DAYS")) or "30"
+            ),
+            audio_cache_cleanup_on_startup=(
+                (
+                    _parse_env_value(os.getenv("AUDIO_CACHE_CLEANUP_ON_STARTUP"))
+                    or "true"
+                ).lower()
+                == "true"
+            ),
+            audio_cache_cleanup_threshold=float(
+                _parse_env_value(os.getenv("AUDIO_CACHE_CLEANUP_THRESHOLD")) or "0.8"
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:
