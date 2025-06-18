@@ -193,6 +193,14 @@ git-hooks: ## Set up git pre-commit hooks with main branch protection
 	@echo 'echo "🔍 Running quality checks..."' >> .git/hooks/pre-commit
 	@echo "make quality" >> .git/hooks/pre-commit
 	@echo "" >> .git/hooks/pre-commit
+	@echo "# Run unit tests (without coverage requirements for speed)" >> .git/hooks/pre-commit
+	@echo 'echo "🧪 Running unit tests..."' >> .git/hooks/pre-commit
+	@echo 'if ! uv run python -m pytest tests/ -x --tb=short --cov-fail-under=0 --disable-warnings; then' >> .git/hooks/pre-commit
+	@echo '    echo "❌ Unit tests failed! Please fix the issues before committing."' >> .git/hooks/pre-commit
+	@echo '    echo "💡 Tip: Run '\''uv run python -m pytest tests/ -v'\'' for more details"' >> .git/hooks/pre-commit
+	@echo '    exit 1' >> .git/hooks/pre-commit
+	@echo 'fi' >> .git/hooks/pre-commit
+	@echo "" >> .git/hooks/pre-commit
 	@echo 'echo "✅ Pre-commit checks passed!"' >> .git/hooks/pre-commit
 	chmod +x .git/hooks/pre-commit
 	@echo "✅ Git hooks with main branch protection installed!"
