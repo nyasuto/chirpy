@@ -89,7 +89,7 @@ markers = [
 [dependency-groups]
 dev = [
     "mypy>=1.16.0",
-    "ruff>=0.11.13",
+    "ruff>=0.15.11",
     "types-keyboard>=0.13.2.20260408",
     "types-requests>=2.33.0.20260408",
     "pytest>=8.0.0",
