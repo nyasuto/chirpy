@@ -16,7 +16,7 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "langdetect>=1.0.9",
     "rich>=15.0.0",
-    "sqlmodel>=0.0.24",
+    "sqlmodel>=0.0.38",
 ]
 
 [build-system]
