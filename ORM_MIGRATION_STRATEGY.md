@@ -80,6 +80,7 @@ This allows zero-breaking-change migration by providing the same interface.
 ```python
 class Article(SQLModel, table=True):
     """Type-safe Article model matching existing schema."""
+
     id: Optional[int] = Field(default=None, primary_key=True)
     title: Optional[str] = Field(default=None)
     # ... other fields with proper types
