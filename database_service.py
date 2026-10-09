@@ -10,7 +10,7 @@ This module provides a modern replacement for db_utils.py with:
 
 import sqlite3
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -162,7 +162,7 @@ class DatabaseService:
 
                 if not existing:
                     read_record = ReadArticle(
-                        article_id=article_id, read_at=datetime.now()
+                        article_id=article_id, read_at=datetime.now(UTC)
                     )
                     session.add(read_record)
                     session.commit()
