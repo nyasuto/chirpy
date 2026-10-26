@@ -8,7 +8,7 @@ This module defines the database schema using SQLModel, providing:
 - Modern Python type hints
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlmodel import JSON, Column, Field, SQLModel, create_engine, select
@@ -37,7 +37,7 @@ class ReadArticle(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     article_id: int = Field(foreign_key="articles.id", unique=True)
-    read_at: datetime | None = Field(default_factory=datetime.now)
+    read_at: datetime | None = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ReadingSession(SQLModel, table=True):

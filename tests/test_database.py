@@ -1,6 +1,6 @@
 """Tests for DatabaseService/DatabaseManager operations."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -104,7 +104,7 @@ class TestDatabaseService:
                 session.add(article)
 
             # Mark article 1 as read
-            session.add(ReadArticle(article_id=1, read_at=datetime.now()))
+            session.add(ReadArticle(article_id=1, read_at=datetime.now(UTC)))
             session.commit()
 
         stats = db_service.get_database_stats()
@@ -164,7 +164,7 @@ class TestDatabaseService:
                 session.add(article)
 
             # Mark article 1 as read
-            session.add(ReadArticle(article_id=1, read_at=datetime.now()))
+            session.add(ReadArticle(article_id=1, read_at=datetime.now(UTC)))
             session.commit()
 
         unread_articles = db_service.get_unread_articles()
