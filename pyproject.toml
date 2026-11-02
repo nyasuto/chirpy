@@ -91,14 +91,14 @@ dev = [
     "ruff>=0.17.3",
     "types-keyboard>=0.13.2.20260508",
     "types-requests>=2.33.0.20261030",
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "pytest-mock>=3.17.0",
     "pytest-asyncio>=1.4.0",
     "responses>=0.26.3",
 ]
 test = [
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "pytest-mock>=3.17.0",
     "pytest-asyncio>=1.4.0",
